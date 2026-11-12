@@ -13,7 +13,7 @@ permissions:
   id-token: write
 concurrency:
   group: sidesteps-pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   publish:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
@@ -35,22 +35,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate JavaScript and domain model
+      - name: Validate stable and candidate
         run: |
-          node --check preview-src/model.js
-          node --check preview-src/app.js
-          node --check preview-src/sw.js
-          node --test preview-src/tests/*.test.cjs
-      - name: Validate candidate config and manifest
-        run: |
-          python3 -m json.tool preview-src/config.json > /dev/null
-          python3 -m json.tool preview-src/manifest.webmanifest > /dev/null
-          (cd preview-src && sha256sum -c MANIFEST_SHA256.txt)
+          for dir in stable-src preview-src; do
+            node --check "$dir/model.js"
+            node --check "$dir/app.js"
+            node --check "$dir/sw.js"
+            node --test "$dir"/tests/*.test.cjs
+            python3 -m json.tool "$dir/config.json" > /dev/null
+            python3 -m json.tool "$dir/manifest.webmanifest" > /dev/null
+            (cd "$dir" && sha256sum -c MANIFEST_SHA256.txt)
+          done
       - name: Build Pages directory
         run: |
           mkdir -p public/preview
-          cp stable-src/index.html public/index.html
           for name in index.html app.js model.js styles.css config.json sw.js manifest.webmanifest icon.svg; do
+            cp "stable-src/$name" "public/$name"
             cp "preview-src/$name" "public/preview/$name"
           done
           touch public/.nojekyll
@@ -63,3 +63,26 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+  tag_release:
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout published stable commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - name: Create immutable release tag if absent
+        run: |
+          grep -qx 'sidesteps v0.2.0' <(head -n 1 RELEASE_INFO.txt)
+          if git ls-remote --exit-code origin refs/tags/v0.2.0; then
+            echo 'v0.2.0 already exists; no change to tag.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a v0.2.0 -m 'sidesteps v0.2.0 — accepted stable baseline'
+          git push origin refs/tags/v0.2.0
