@@ -1,0 +1,61 @@
+name: Test and publish sidesteps to Pages
+on:
+  push:
+    branches: [main, develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: sidesteps-pages
+  cancel-in-progress: true
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout stable branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: stable-src
+      - name: Checkout candidate branch
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          path: preview-src
+      - name: Node.js for regression checks
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript and domain model
+        run: |
+          node --check preview-src/model.js
+          node --check preview-src/app.js
+          node --check preview-src/sw.js
+          node --test preview-src/tests/*.test.cjs
+      - name: Validate candidate config and manifest
+        run: |
+          python3 -m json.tool preview-src/config.json > /dev/null
+          python3 -m json.tool preview-src/manifest.webmanifest > /dev/null
+          (cd preview-src && sha256sum -c MANIFEST_SHA256.txt)
+      - name: Build Pages directory
+        run: |
+          mkdir -p public/preview
+          cp stable-src/index.html public/index.html
+          for name in index.html app.js model.js styles.css config.json sw.js manifest.webmanifest icon.svg; do
+            cp "preview-src/$name" "public/preview/$name"
+          done
+          touch public/.nojekyll
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
