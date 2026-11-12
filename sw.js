@@ -1,1 +1,27 @@
-const CACHE='interval-lab-shell-v10-rc2';const SHELL=['./','./index.html','./model.js','./app.js','./styles.css','./config.json','./icon.svg','./manifest.webmanifest'];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(Promise.all([caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('interval-lab-shell-')&&k!==CACHE).map(k=>caches.delete(k)))),self.clients.claim()])));self.addEventListener('fetch',e=>{if(e.request.method!=='GET'||new URL(e.request.url).origin!==self.location.origin)return;let u=new URL(e.request.url);if(!u.pathname.startsWith(new URL(self.registration.scope).pathname))return;e.respondWith((async()=>{let cache=await caches.open(CACHE);try{let response=await fetch(e.request);if(response.ok)cache.put(e.request,response.clone());return response;}catch(err){let saved=await cache.match(e.request,{ignoreSearch:true});if(saved)return saved;if(e.request.mode==='navigate')return cache.match('./index.html');throw err;}})());});
+/* sidesteps cache scoped to this PWA path; does not erase legacy Interval Lab caches. */
+const SCOPE_ID = new URL(self.registration.scope).pathname.replace(/[^A-Za-z0-9]/g, '_');
+const PREFIX = 'sidesteps-shell-' + SCOPE_ID + '-';
+const CACHE = PREFIX + 'rc2-migration-1';
+const SHELL = ['./','./index.html','./model.js','./app.js','./styles.css','./config.json','./icon.svg','./manifest.webmanifest'];
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
+self.addEventListener('activate', e => e.waitUntil(Promise.all([
+  caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE).map(k => caches.delete(k)))),
+  self.clients.claim()
+])));
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
+  if (!new URL(e.request.url).pathname.startsWith(new URL(self.registration.scope).pathname)) return;
+  e.respondWith((async () => {
+    const cache = await caches.open(CACHE);
+    try {
+      const response = await fetch(e.request);
+      if (response.ok) cache.put(e.request, response.clone());
+      return response;
+    } catch (error) {
+      const saved = await cache.match(e.request, {ignoreSearch:true});
+      if (saved) return saved;
+      if (e.request.mode === 'navigate') return cache.match('./index.html');
+      throw error;
+    }
+  })());
+});

@@ -1,4 +1,4 @@
-/* Interval Lab 2.0: deterministic domain logic. No DOM or network. */
+/* sidesteps 2.0: deterministic domain logic. No DOM or network. */
 (function(root, factory) { const m = factory(); if (typeof module !== 'undefined' && module.exports) module.exports = m; else root.ILModel = m; })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
   const KEY = 'interval-lab:data:v5', LEGACY_KEY = 'interval-lab:data:v1';
