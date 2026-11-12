@@ -1,0 +1,8 @@
+Interval Lab 2.0.0-rc.2
+Build date: 2026-11-12
+Status: RELEASE CANDIDATE — not final
+Derived from: 2.0.0-rc.1 (independent copy)
+Changes in rc.2: owner-selected trainer PIN verifier installed (PBKDF2-SHA256 with random salt); PWA cache version incremented; release documentation updated.
+PIN: stored nowhere in project as plaintext; trainerAccess configured in config.json.
+Validation: refer to RELEASE_REPORT.md for executed tests and limitations.
+Deployment: NOT performed. Existing 1.4.3 remains unchanged.

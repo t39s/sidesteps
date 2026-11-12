@@ -1,0 +1,13 @@
+{
+  "minTapGapMs": 500,
+  "intervalCount": 20,
+  "restDurationSec": 120,
+  "resultDisplaySec": 10,
+  "audioPolicy": "user-controllable",
+  "trainerAccess": {
+    "algorithm": "PBKDF2-SHA256",
+    "iterations": 200000,
+    "saltB64": "hRChAcIpAkCNpKBs43h+5w==",
+    "verifierB64": "DqNqS54A49ULG5BlYgFM0+I7HniQg4bcWjq/5uQtpJI="
+  }
+}
