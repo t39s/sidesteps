@@ -1,10 +1,10 @@
-sidesteps v0.2.0
-Acceptance date: 2026-11-12
-Status: STABLE BASELINE — accepted by product owner
-Source: sidesteps develop, migrated from historical Interval Lab RC2
-Functional changes vs accepted candidate: none; presentation/version and deployment only.
-Known issue: “Начать раньше” may fail for adult and initially for child (see KNOWN_ISSUES.md); ACCEPT.
-Stable channel: https://t39s.github.io/sidesteps/
-Preview channel: https://t39s.github.io/sidesteps/preview/
-Git identity: tag v0.2.0 (created by release automation after a successful deployment).
-Verification: see RELEASE_REPORT.md and MANIFEST_SHA256.txt.
+sidesteps v0.2.1-rc.1
+Build date: 2026-11-12
+Status: RELEASE CANDIDATE — not accepted as stable
+Base: accepted sidesteps v0.2.0 (main/tag v0.2.0)
+Branch: develop
+Changes: early-start rest button reliability; version only on footer final line; child mode label Дети; compact five-bar progress chart in portrait view.
+Domain model and storage schema: unchanged.
+Known issue KI-001 in v0.2.0: fix candidate, pending user acceptance.
+Publishing: /preview/ through existing GitHub Actions pipeline; stable / stays v0.2.0.
+Validation evidence: RELEASE_REPORT.md; MANIFEST_SHA256.txt.

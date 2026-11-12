@@ -7,8 +7,8 @@ ROOT=Path(__file__).resolve().parents[1]
 PIN='246810'
 CONFIG={'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
 
-def make_page(browser, data=None, pin=True, config_overrides=None):
-    page=browser.new_page(viewport={'width':430,'height':900}, device_scale_factor=1)
+def make_page(browser, data=None, pin=True, config_overrides=None, viewport_width=430, mobile=False):
+    page=browser.new_page(viewport={'width':viewport_width,'height':900}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile)
     errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
     page.set_content((ROOT/'index.html').read_text())
     config={**CONFIG,**(config_overrides or {})};config['trainerAccess']=CONFIG['trainerAccess'] if pin else None
