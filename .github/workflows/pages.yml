@@ -1,8 +1,12 @@
 name: Test and publish sidesteps to Pages
 on:
   push:
-    branches: [main, develop]
+    branches: [main]
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Validate sidesteps candidate"]
+    types: [completed]
+    branches: [develop]
 permissions:
   contents: read
   pages: write
@@ -12,6 +16,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   publish:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -22,13 +27,12 @@ jobs:
         with:
           ref: main
           path: stable-src
-      - name: Checkout candidate branch
+      - name: Checkout validated candidate
         uses: actions/checkout@v4
         with:
-          ref: develop
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'develop' }}
           path: preview-src
-      - name: Node.js for regression checks
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Validate JavaScript and domain model
