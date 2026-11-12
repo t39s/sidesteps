@@ -1,0 +1,26 @@
+name: Validate sidesteps candidate
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate JavaScript and domain model
+        run: |
+          node --check model.js
+          node --check app.js
+          node --check sw.js
+          node --test tests/*.test.cjs
+      - name: Validate candidate config and manifest
+        run: |
+          python3 -m json.tool config.json > /dev/null
+          python3 -m json.tool manifest.webmanifest > /dev/null
+          sha256sum -c MANIFEST_SHA256.txt
