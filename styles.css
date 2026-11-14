@@ -33,3 +33,13 @@
 .history-chart-axis{display:block;width:40px;height:208px}
 .chart-scrollable{overflow-x:auto}
 .chart-scrollable .chart{height:208px;max-width:none}
+
+:root{--attempt-height:min(56vh,560px)}
+.tap-surface.personal-measure{min-height:var(--attempt-height)}
+.half-attempt{min-height:calc(var(--attempt-height) / 2)}
+.attempt-result,.personal-rest{display:flex;flex-direction:column;align-items:center;text-align:center}
+.attempt-result{justify-content:center}
+.personal-rest:not(.half-attempt){min-height:var(--attempt-height)}
+.personal-rest-time{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.personal-rest:not(.half-attempt) .display{font-size:clamp(68px,17vw,116px)}
+@media(min-width:650px){:root{--attempt-height:510px}}

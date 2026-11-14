@@ -136,11 +136,15 @@ def test_rest_and_early_start(browser):
     assert page.get_by_role('button',name='История',exact=True).count()==0
     tap(page);tap(page)
     page.get_by_text('Попытка 1',exact=True).wait_for()
-    assert page.locator('.panel .muted').filter(has_text='Попытка 1').inner_text()=='Попытка 1'
+    assert page.get_by_role('heading',name='Попытка 1',exact=True).is_visible()
+    assert page.locator('.attempt-result .display').inner_text().split(',')[1].endswith(' с')
+    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==2
+    result_button_width=page.get_by_role('button',name='Начать раньше').bounding_box()['width']
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
     page.evaluate('Date.now = (()=>{const d=Date.now;return ()=>d()+10000;})()')
     page.get_by_role('heading',name='Отдых',exact=True).wait_for()
+    assert page.get_by_role('button',name='Начать раньше').bounding_box()['width']==result_button_width
     assert page.get_by_text('Спортсмен',exact=True).count()==0
     assert page.locator('footer').get_by_role('link',name='Войти').is_visible()
     page.get_by_role('button',name='Начать раньше').click()
