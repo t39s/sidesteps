@@ -99,20 +99,21 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.1 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.2 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
         assert login.evaluate(font)==version.evaluate(font)
         assert abs(version.bounding_box()['y']-login.bounding_box()['y'])<1
-        assert q.locator('.app-head .brand').inner_text()=='sidesteps'
+        assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
         q.get_by_role('heading',name='Вход администратора').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
         q.get_by_role('button',name='Назад').click()
-        assert q.locator('h1').inner_text()=='Приставные шаги\nна время'
+        assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
+        assert q.get_by_text('Две попытки по умолчанию.',exact=False).count()==0
         assert not errors+errs,errors+errs
         q.close()
 
