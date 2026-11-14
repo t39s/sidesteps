@@ -41,5 +41,5 @@
 .attempt-result{justify-content:center}
 .personal-rest:not(.half-attempt){min-height:var(--attempt-height)}
 .personal-rest-time{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.personal-rest:not(.half-attempt) .display{font-size:clamp(68px,17vw,116px)}
+.attempt-result .display,.personal-rest:not(.half-attempt) .display{font-size:clamp(68px,17vw,116px)}
 @media(min-width:650px){:root{--attempt-height:510px}}

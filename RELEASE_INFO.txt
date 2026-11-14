@@ -1,4 +1,4 @@
-sidesteps v0.2.3-rc.9
+sidesteps v0.2.3-rc.10
 Status: RELEASE CANDIDATE
 Base: v0.2.2 (7339a801e51959b773b4bf8ce4628583bd502cd0)
 Branch: develop
