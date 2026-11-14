@@ -15,3 +15,5 @@
 .athlete-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .athlete-tabs button{padding:10px 6px}
 .athlete-tabs [aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#082132}
+
+.brand-home{display:block;text-decoration:none}

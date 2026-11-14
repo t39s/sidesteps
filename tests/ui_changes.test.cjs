@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.2-rc\.4<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.2-rc\.5<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.2/);
@@ -10,7 +10,7 @@ test('athlete footer contains the version and administrator link on one line',()
 });
 test('athlete heading and administrator terminology',()=>{
   const app=get('app.js');
-  assert.match(app,/<div class="brand">Приставные шаги<br>на время<\/div>/);
+  assert.match(app,/const label='Приставные шаги<br>на время'/);
   assert.doesNotMatch(app,/header\('(Спортсмен|Дети|Ребёнок)'/);
   assert.match(app,/header\('Администратор'/);
   assert.match(app,/Нет — один участник/);

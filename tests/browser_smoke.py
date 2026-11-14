@@ -51,6 +51,8 @@ def test_adult(browser):
     assert state['attempts'][0]['totalMs']>0
     assert 'Мой прогресс' in page.locator('body').inner_text()
     page.screenshot(path=str(ROOT/'tests'/'adult_screenshot.png'))
+    page.get_by_role('link',name='Приставные шаги на время').click()
+    assert page.get_by_role('tab',name='История').get_attribute('aria-selected')=='true'
     assert not errors, errors
     page.close()
     return state
@@ -133,7 +135,12 @@ def test_rest_and_early_start(browser):
     page.get_by_text('Попытка 2 из 2').wait_for()
     tap(page);tap(page)
     page.get_by_text('Тренировка завершена').wait_for()
-    page.get_by_role('button',name='История',exact=True).click()
+    assert page.locator('main > .panel').count()==3
+    assert page.get_by_role('heading',name='Тренировки',exact=True).count()==0
+    details=page.get_by_text('Подробнее',exact=True)
+    details.click()
+    assert page.get_by_text('Попытка 1',exact=True).is_visible()
+    page.get_by_role('button',name='На главную',exact=True).click()
     assert page.get_by_role('tab',name='История').get_attribute('aria-selected')=='true'
     assert not errors,errors
     page.close()
