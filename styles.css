@@ -13,8 +13,9 @@
 @media(max-width:400px){.shell{padding:14px 10px 32px}.panel{padding:14px;margin:12px 0}.chart-wrap{margin-left:-2px;width:calc(100% + 4px)}}
 
 .athlete-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.athlete-tabs button{padding:10px 6px}
-.athlete-tabs [aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#082132}
+.athlete-tabs button,.settings-title{padding:10px 6px;border:1px solid var(--line);border-radius:13px;font:inherit;font-weight:650}
+.settings-title{margin:0;text-align:center}
+.athlete-tabs [aria-selected="true"],.settings-title{background:var(--accent);border-color:var(--accent);color:#082132}
 
 .brand-home{display:block;color:#fff;text-decoration:none}
 
