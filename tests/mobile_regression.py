@@ -113,6 +113,9 @@ def test_chart_5_bars_portrait(browser):
         assert workouts.locator('.history-list > .history-item').count()==6
         latest_date=q.evaluate("window.ILModel.date('2026-10-07T00:00:00.000Z')")
         assert workouts.get_by_text(latest_date,exact=True).count()==0
+        workouts.get_by_role('button',name='5 тренировок').click()
+        assert workouts.locator('.history-list > .history-item').count()==5
+        assert workouts.get_by_role('button',name='Все тренировки').is_visible()
         chart=cards.nth(1).locator('.chart')
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
@@ -123,7 +126,7 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.3 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.4 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

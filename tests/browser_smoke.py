@@ -42,7 +42,7 @@ def test_adult(browser):
     exercise.click()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'
-    assert mode.locator('option:checked').inner_text()=='1 отсечек (по умолчанию)'
+    assert mode.locator('option:checked').inner_text()=='1 отсечка (по умолчанию)'
     mode.select_option('stopwatch')
     page.get_by_role('tab',name='История').click()
     exercise.click()
