@@ -102,7 +102,8 @@ def test_chart_5_bars_portrait(browser):
         assert footer.inner_text()=='sidesteps v. 0.2.2-rc.1 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
-        assert login.evaluate("(e)=>getComputedStyle(e).font") == version.evaluate("(e)=>getComputedStyle(e).font")
+        font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
+        assert login.evaluate(font)==version.evaluate(font)
         assert abs(version.bounding_box()['y']-login.bounding_box()['y'])<1
         assert q.locator('.app-head .brand').inner_text()=='sidesteps'
         login.focus()
