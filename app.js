@@ -75,6 +75,7 @@ function selectAthleteTab(tab){
     item.tabIndex=selected?0:-1;
     $(item.getAttribute('aria-controls')).hidden=!selected;
   }
+  initializeProgressScroll();
   tab.focus();
 }
 function legacyResumeChoices(){const ids=[currentAthlete()];const pending=db.workouts.filter(w=>ids.includes(w.athleteId)&&w.status==='legacy_pending');return pending.length?card('<h2>Ранее незавершённые тренировки</h2>'+pending.map(w=>'<div class="list-row"><span>'+esc(M.datetime(w.createdAt))+'</span>'+b('Продолжить','resume-legacy','small',`data-id="${esc(w.id)}"`)+'</div>').join('')):'';}
@@ -118,17 +119,32 @@ function finalAdult(){
     card('<h2>Мой прогресс</h2>'+graphic(points.slice(-5)))+
     `<div class="buttons">${b('На главную','final-home','wide')}</div>`;
 }
+function initializeProgressScroll(){
+  const plot=app.querySelector('.chart-scrollable:not([data-positioned])');
+  if(!plot?.clientWidth)return;
+  plot.scrollLeft=plot.scrollWidth;
+  plot.dataset.positioned='true';
+}
 function graphic(points,scrollable=false){
   if(!points.length)return muted('Пока нет завершённых тренировок.');
-  const visible=points.slice(-5); // strictly the five latest completed workouts
+  const visible=points.slice(scrollable?-100:-5);
   const max=Math.max(...visible.map(p=>p.ms)),hi=Math.max(1000,Math.ceil(max*1.13/1000)*1000);
-  const W=300,H=208,left=40,right=8,top=21,bottom=37;
-  const floor=H-bottom,plot=H-top-bottom,slot=(W-left-right)/5;
+  const H=208,left=scrollable?0:40,right=8,top=21,bottom=37;
+  const slot=scrollable?76:(300-left-right)/5;
+  const W=scrollable?visible.length*slot+right:300;
+  const floor=H-bottom,plot=H-top-bottom;
   const y=ms=>floor-(ms/hi)*plot;
   const best=Math.min(...visible.map(p=>p.ms));
-  const ticks=[0,.25,.5,.75,1].map(fr=>{const yy=y(hi*fr);return `<line x1="${left}" y1="${yy}" x2="${W-right}" y2="${yy}" stroke="#38536b" stroke-width=".7"/><text x="${left-5}" y="${yy+3}" text-anchor="end" class="svg-txt">${(hi*fr/1000).toFixed(hi<20000?1:0)}</text>`;}).join('');
+  const ticks=[0,.25,.5,.75,1].map(fr=>({
+    y:y(hi*fr),
+    label:(hi*fr/1000).toFixed(hi<20000?1:0)
+  }));
+  const lines=ticks.map(tick=>`<line x1="${left}" y1="${tick.y}" x2="${W-right}" y2="${tick.y}" stroke="#38536b" stroke-width=".7"/>`).join('');
+  const labels=ticks.map(tick=>`<text x="35" y="${tick.y+3}" text-anchor="end" class="svg-txt">${tick.label}</text>`).join('')+'<text x="8" y="12" class="svg-txt">с</text>';
   const bars=visible.map((p,i)=>{const x=left+slot*(i+.5),w=slot*.63,yy=y(p.ms),color=p.ms===best?'#ffd166':'#83def3';const label=(p.ms/1000).toFixed(1).replace('.',',');return `<g class="chart-bar"><title>${esc(M.datetime(p.when))}: ${esc(M.fmt(p.ms))}</title><rect x="${x-w/2}" y="${yy}" width="${w}" height="${Math.max(.8,floor-yy)}" rx="3" fill="${color}"/><text x="${x}" y="${Math.max(top+3,yy-5)}" text-anchor="middle" class="chart-value">${label}</text><text x="${x}" y="${H-15}" text-anchor="middle" class="chart-date">${esc(M.date(p.when))}</text></g>`;}).join('');
-  return `<div class="chart-wrap${scrollable?' chart-scrollable':''}"${scrollable?' tabindex="0" role="region" aria-label="Диаграмма прогресса"':''}><svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Столбчатый график последних ${visible.length} завершённых тренировок, в секундах, ось от нуля">${ticks}${bars}<text x="8" y="12" class="svg-txt">с</text></svg></div>`;
+  const chart=`<svg class="chart"${scrollable?` style="width:${W}px"`:''} viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Столбчатый график последних ${visible.length} завершённых тренировок, в секундах, ось от нуля">${lines}${bars}${scrollable?'':labels}</svg>`;
+  if(scrollable)return `<div class="history-chart"><svg class="history-chart-axis" viewBox="0 0 40 ${H}" aria-hidden="true">${labels}</svg><div class="chart-scrollable" tabindex="0" role="region" aria-label="Диаграмма прогресса">${chart}</div></div>`;
+  return `<div class="chart-wrap">${chart}</div>`;
 }
 function recordAsOf(athleteId){return M.baseline(db,athleteId);}
 function workoutSummary(athleteId,workout,heading=false){
@@ -146,7 +162,7 @@ function progress(athleteId,child=false,separate=false){
   const last=M.publicWorkouts(db,athleteId).at(-1);
   const points=M.renderChartData(db,athleteId);
   const summary=workoutSummary(athleteId,last,separate);
-  const chart='<h2>Мой прогресс</h2>'+graphic(points.slice(-5),separate);
+  const chart='<h2>Мой прогресс</h2>'+graphic(points,separate);
   const workouts=historyItems(athleteId,child,separate);
   if(separate)return card(summary+(last?workoutDetails(last,M.best(db,last),true):''))+card(chart)+card(workouts);
   return card(`${summary}<div class="progress-chart">${chart}</div>${workouts}`);
@@ -178,7 +194,14 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
   return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(a=>`<div class="list-row"><span>${esc(a.name)}</span>${b('История','trainer-history','small',`data-id="${esc(a.id)}"`)} ${db.athletes.length>1?b('Удалить','delete-athlete','danger small',`data-id="${esc(a.id)}"`):''}</div>`).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div><label>Мой профиль спортсмена<select id="coach-athlete">${db.athletes.map(a=>`<option value="${esc(a.id)}" ${a.id===db.device.trainerAthleteId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`)+card(`<h2>Добавить архивный результат</h2><p class="note">Историческое время без отдельных попыток. Не редактирует уже измеренные значения.</p><label>Спортсмен<select id="archive-athlete">${options}</select></label><label>Дата<input type="date" id="archive-date"></label><label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label><div class="buttons">${b('Добавить в архив','add-archive','primary')}</div>`)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function pinScreen(){return header()+card(`<h2>Вход администратора</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного администратором, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;let html='';if(renderError)html=card(`<div class="error">${esc(renderError)}</div><div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAdminLogin=!renderError&&screen!=='pin'&&screen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.3-rc.6</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;}
+function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(renderError)html=card(`<div class="error">${esc(renderError)}</div><div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAdminLogin=!renderError&&screen!=='pin'&&screen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.3-rc.7</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
+  const plot=app.querySelector('.chart-scrollable');
+  if(plot?.clientWidth&&plotOffset!==undefined){
+    plot.scrollLeft=plotOffset;
+    plot.dataset.positioned='true';
+  }
+  initializeProgressScroll();
+}
 function go(newScreen,lastInterface=null){if(lastInterface){change(n=>{n.device.lastInterface=lastInterface;});}
   if(newScreen==='child-ready'){
     const c=M.currentChild(db),turn=M.nextTurn(db),w=M.workoutOf(db,turn?.workoutId);

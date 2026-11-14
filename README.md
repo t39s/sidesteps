@@ -1,4 +1,4 @@
-# sidesteps v0.2.3-rc.6 — кандидат
+# sidesteps v0.2.3-rc.7 — кандидат
 
 **Статус: кандидат в `develop` на основе стабильной v0.2.2.** Изменения и проверки: `RELEASE_REPORT.md`; ограничения: `KNOWN_ISSUES.md`.
 

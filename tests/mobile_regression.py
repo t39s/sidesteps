@@ -72,7 +72,7 @@ def test_child_single_reload_and_early(browser):
     restored.close()
 
 
-def test_chart_5_bars_portrait(browser):
+def test_history_chart_portrait(browser):
     p,errs=make_page(browser,pin=False)
     data=p.evaluate('''() => {
       const M=window.ILModel;let s=M.blank();
@@ -102,7 +102,7 @@ def test_chart_5_bars_portrait(browser):
         assert history.get_attribute('aria-selected')=='true'
         assert not start.is_visible()
         cards=q.get_by_role('tabpanel',name='История').locator(':scope > .panel')
-        date=q.evaluate("window.ILModel.datetime('2026-10-07T00:00:00.000Z')")
+        date=q.evaluate("window.ILModel.datetime('2027-01-13T00:00:00.000Z')")
         title=f'Тренировка {date}'
         assert [cards.nth(i).locator('h2').first.inner_text() for i in range(3)]==[
             title,'Мой прогресс','Тренировки']
@@ -114,24 +114,28 @@ def test_chart_5_bars_portrait(browser):
         workouts=cards.nth(2)
         assert workouts.locator('.history-list > .history-item').count()==5
         workouts.get_by_role('button',name='Все тренировки').click()
-        assert workouts.locator('.history-list > .history-item').count()==6
-        latest_date=q.evaluate("window.ILModel.date('2026-10-07T00:00:00.000Z')")
+        assert workouts.locator('.history-list > .history-item').count()==104
+        latest_date=q.evaluate("window.ILModel.date('2027-01-13T00:00:00.000Z')")
         assert workouts.get_by_text(latest_date,exact=True).count()==0
         workouts.get_by_role('button',name='5 тренировок').click()
         assert workouts.locator('.history-list > .history-item').count()==5
         assert workouts.get_by_role('button',name='Все тренировки').is_visible()
         chart=cards.nth(1).locator('.chart')
         chart.wait_for()
-        assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
-        assert chart.locator('.chart-bar title').count()==5
+        assert chart.locator('rect').count()==100,(width,chart.locator('rect').count())
+        assert chart.locator('.chart-bar title').count()==100
         scroll=cards.nth(1).get_by_role('region',name='Диаграмма прогресса')
-        assert scroll.evaluate('(e)=>{e.scrollLeft=e.scrollWidth;return e.scrollLeft>0}'),width
+        assert scroll.evaluate('(e)=>Math.abs(e.scrollWidth-e.clientWidth-e.scrollLeft)<2'),width
+        axis=cards.nth(1).locator('.history-chart-axis')
+        axis_left=axis.bounding_box()['x']
+        assert scroll.evaluate('(e)=>{e.scrollLeft=0;return e.scrollLeft===0}'),width
+        assert axis.bounding_box()['x']==axis_left
+        assert axis.get_by_text('0',exact=True).count()==1
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
-        assert '0' in chart.locator('.svg-txt').first.text_content() or 'с' in chart.locator('.svg-txt').first.text_content()
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.6 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.7 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
@@ -152,6 +156,6 @@ def test_chart_5_bars_portrait(browser):
 if __name__ == '__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
-        for test in [test_adult_long_press,test_child_early_without_reload,test_child_single_reload_and_early,test_chart_5_bars_portrait]:
+        for test in [test_adult_long_press,test_child_early_without_reload,test_child_single_reload_and_early,test_history_chart_portrait]:
             test(b);print('PASS',test.__name__)
         b.close()

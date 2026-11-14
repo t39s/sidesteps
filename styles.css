@@ -29,5 +29,7 @@
   .personal-measure .counter[data-digits="3"]{transform:scaleX(.52)}
 }
 
-.chart-wrap.chart-scrollable{width:100%;margin-inline:0;overflow-x:auto}
-.chart-scrollable .chart{min-width:420px;max-width:none}
+.history-chart{display:grid;grid-template-columns:40px minmax(0,1fr);align-items:start}
+.history-chart-axis{display:block;width:40px;height:208px}
+.chart-scrollable{overflow-x:auto}
+.chart-scrollable .chart{height:208px;max-width:none}
