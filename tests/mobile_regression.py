@@ -124,6 +124,11 @@ def test_history_chart_portrait(browser):
         chart.wait_for()
         assert chart.locator('rect').count()==100,(width,chart.locator('rect').count())
         assert chart.locator('.chart-bar title').count()==100
+        mean=chart.locator('.chart-average')
+        assert mean.get_attribute('stroke-width')=='1.4'
+        expected=q.evaluate('window.ILModel.fmt(80600)')
+        assert mean.locator('title').text_content()==f'Среднее по всем тренировкам: {expected}'
+        assert mean.evaluate("(e)=>e.nextElementSibling.classList.contains('chart-bar')")
         scroll=cards.nth(1).get_by_role('region',name='Диаграмма прогресса')
         assert scroll.evaluate('(e)=>Math.abs(e.scrollWidth-e.clientWidth-e.scrollLeft)<2'),width
         axis=cards.nth(1).locator('.history-chart-axis')
@@ -135,7 +140,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.7 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.8 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
