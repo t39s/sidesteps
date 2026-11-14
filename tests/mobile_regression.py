@@ -107,6 +107,10 @@ def test_chart_5_bars_portrait(browser):
         assert [cards.nth(i).locator('h2').first.inner_text() for i in range(3)]==[
             title,'Мой прогресс','Тренировки']
         assert cards.nth(0).get_by_text(title,exact=True).count()==1
+        latest_details=cards.nth(0).locator('details').first
+        assert latest_details.get_attribute('open') is None
+        latest_details.get_by_text('Подробнее',exact=True).click()
+        assert latest_details.get_by_text('Попытка 1',exact=True).is_visible()
         workouts=cards.nth(2)
         assert workouts.locator('.history-list > .history-item').count()==5
         workouts.get_by_role('button',name='Все тренировки').click()
@@ -120,13 +124,14 @@ def test_chart_5_bars_portrait(browser):
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
         assert chart.locator('.chart-bar title').count()==5
-        assert q.locator('.chart-wrap').evaluate('(e)=>e.scrollWidth<=e.clientWidth'),width
+        scroll=cards.nth(1).get_by_role('region',name='Диаграмма прогресса')
+        assert scroll.evaluate('(e)=>{e.scrollLeft=e.scrollWidth;return e.scrollLeft>0}'),width
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
         assert '0' in chart.locator('.svg-txt').first.text_content() or 'с' in chart.locator('.svg-txt').first.text_content()
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.5 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.6 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

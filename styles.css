@@ -28,3 +28,6 @@
   .personal-measure .counter[data-digits="2"]{transform:scaleX(.8)}
   .personal-measure .counter[data-digits="3"]{transform:scaleX(.52)}
 }
+
+.chart-wrap.chart-scrollable{width:100%;margin-inline:0;overflow-x:auto}
+.chart-scrollable .chart{min-width:420px;max-width:none}
