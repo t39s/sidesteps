@@ -102,8 +102,11 @@ def test_chart_5_bars_portrait(browser):
         assert history.get_attribute('aria-selected')=='true'
         assert not start.is_visible()
         cards=q.get_by_role('tabpanel',name='История').locator(':scope > .panel')
+        date=q.evaluate("window.ILModel.datetime('2026-10-07T00:00:00.000Z')")
+        title=f'Тренировка {date}'
         assert [cards.nth(i).locator('h2').first.inner_text() for i in range(3)]==[
-            'Текущая тренировка','Мой прогресс','Тренировки']
+            title,'Мой прогресс','Тренировки']
+        assert cards.nth(0).get_by_text(title,exact=True).count()==1
         chart=cards.nth(1).locator('.chart')
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
@@ -114,7 +117,7 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.6 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.7 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
