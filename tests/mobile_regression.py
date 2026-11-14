@@ -107,6 +107,12 @@ def test_chart_5_bars_portrait(browser):
         assert [cards.nth(i).locator('h2').first.inner_text() for i in range(3)]==[
             title,'Мой прогресс','Тренировки']
         assert cards.nth(0).get_by_text(title,exact=True).count()==1
+        workouts=cards.nth(2)
+        assert workouts.locator('.history-list > .history-item').count()==5
+        workouts.get_by_role('button',name='Все тренировки').click()
+        assert workouts.locator('.history-list > .history-item').count()==6
+        latest_date=q.evaluate("window.ILModel.date('2026-10-07T00:00:00.000Z')")
+        assert workouts.get_by_text(latest_date,exact=True).count()==0
         chart=cards.nth(1).locator('.chart')
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
@@ -117,7 +123,7 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.1 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.3-rc.2 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

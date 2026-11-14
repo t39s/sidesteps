@@ -17,3 +17,14 @@
 .athlete-tabs [aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#082132}
 
 .brand-home{display:block;color:#fff;text-decoration:none}
+
+.tap-surface.personal-measure{padding-inline:8px}
+.personal-measure .counter{font-size:clamp(204px,54vw,420px)}
+.personal-measure:active:not(.flash){background:radial-gradient(circle at 50% 38%,#1a3f57,#0c1d30 70%);color:var(--text)}
+.personal-measure:active:not(.flash) .muted{color:var(--muted)}
+.personal-measure.flash{background:#ffd166;color:#071622}
+.personal-measure .counter[data-digits="3"]{transform:scaleX(.8)}
+@media(max-width:760px){
+  .personal-measure .counter[data-digits="2"]{transform:scaleX(.8)}
+  .personal-measure .counter[data-digits="3"]{transform:scaleX(.52)}
+}

@@ -133,12 +133,9 @@ def test_rest_and_early_start(browser):
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
     page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
-    page.get_by_role('button',name='История',exact=True).click()
-    page.get_by_text('Мой прогресс',exact=True).wait_for()
-    assert page.get_by_text('Спортсмен',exact=True).count()==0
-    page.get_by_role('button',name='Назад',exact=True).click()
-    page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
+    assert page.get_by_role('button',name='История',exact=True).count()==0
     tap(page);tap(page)
+    page.get_by_text('Попытка 1',exact=True).wait_for()
     assert page.locator('.panel .muted').filter(has_text='Попытка 1').inner_text()=='Попытка 1'
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
