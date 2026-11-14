@@ -38,7 +38,15 @@ def trainer(page):
 
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
+    exercise=page.get_by_role('tab',name='Новое упражнение')
+    exercise.click()
+    mode=page.locator('#mode-select')
+    assert mode.input_value()=='intervals'
+    assert mode.locator('option:checked').inner_text()=='1 отсечек (по умолчанию)'
+    mode.select_option('stopwatch')
+    page.get_by_role('tab',name='История').click()
+    exercise.click()
+    assert mode.input_value()=='intervals'
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
@@ -109,6 +117,13 @@ def test_pin_no_config(browser):
     page.get_by_role('link',name='Войти',exact=True).click()
     page.get_by_text('PIN пока не сконфигурирован',exact=False).wait_for(timeout=5000)
     assert 'pin-input' not in page.locator('body').inner_html()
+    assert page.get_by_text('Доступ администратора',exact=True).count()==0
+    card=page.locator('main > .panel')
+    back=page.get_by_role('button',name='Назад',exact=True)
+    assert card.get_by_role('button',name='Назад').count()==0
+    assert abs(back.bounding_box()['width']-card.bounding_box()['width'])<1
+    back.click()
+    assert page.get_by_role('tab',name='История').is_visible()
     page.close()
 
 
