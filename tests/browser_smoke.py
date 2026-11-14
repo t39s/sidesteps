@@ -115,15 +115,26 @@ def test_rest_and_early_start(browser):
     page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
+    page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
+    page.get_by_role('button',name='История',exact=True).click()
+    page.get_by_text('Мой прогресс',exact=True).wait_for()
+    assert page.get_by_text('Спортсмен',exact=True).count()==0
+    page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
     tap(page);tap(page)
+    assert page.locator('.panel .muted').filter(has_text='Попытка 1').inner_text()=='Попытка 1'
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
     page.evaluate('Date.now = (()=>{const d=Date.now;return ()=>d()+10000;})()')
-    page.get_by_text('Отдых',exact=True).wait_for()
+    page.get_by_role('heading',name='Отдых',exact=True).wait_for()
+    assert page.get_by_text('Спортсмен',exact=True).count()==0
+    assert page.locator('footer').get_by_role('link',name='Войти').is_visible()
     page.get_by_role('button',name='Начать раньше').click()
     page.get_by_text('Попытка 2 из 2').wait_for()
     tap(page);tap(page)
     page.get_by_text('Тренировка завершена').wait_for()
+    page.get_by_role('button',name='История',exact=True).click()
+    assert page.get_by_role('tab',name='История').get_attribute('aria-selected')=='true'
     assert not errors,errors
     page.close()
 
