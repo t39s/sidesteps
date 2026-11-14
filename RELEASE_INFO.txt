@@ -1,6 +1,8 @@
-sidesteps v0.2.5-rc.1
-Status: RELEASE CANDIDATE
+sidesteps v0.2.5
+Release date: 2026-11-15
+Status: ACCEPTED STABLE RELEASE
+Accepted candidate: v0.2.5-rc.1 (d5082af1ee3e4bf7d318f3ccc10be0e359fbd473)
 Base: v0.2.4 (59a702f06986e8f6bf2dea950ab2777a6a6e68f5)
-Branch: develop
-Publishing: /preview/ through GitHub Actions.
+Branch: main
+Publishing: stable / through GitHub Actions.
 Validation evidence: RELEASE_REPORT.md; MANIFEST_SHA256.txt.
