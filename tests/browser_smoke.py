@@ -23,7 +23,7 @@ def make_page(browser, data=None, pin=True, config_overrides=None, viewport_widt
     page.add_style_tag(content=(ROOT/'styles.css').read_text())
     page.add_script_tag(content=(ROOT/'model.js').read_text())
     page.add_script_tag(content=(ROOT/'app.js').read_text())
-    page.get_by_text('Новая тренировка').wait_for(timeout=5000) if not data else page.wait_for_timeout(350)
+    page.get_by_role('tab',name='История').wait_for(timeout=5000) if not data else page.wait_for_timeout(350)
     return page,errors
 
 def tap(page):
@@ -38,6 +38,7 @@ def trainer(page):
 
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
@@ -111,6 +112,7 @@ def test_pin_no_config(browser):
 
 def test_rest_and_early_start(browser):
     page,errors=make_page(browser,pin=False)
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
     tap(page);tap(page)
@@ -127,6 +129,7 @@ def test_rest_and_early_start(browser):
 
 def test_timeout_and_resume(browser):
     page,errors=make_page(browser,pin=False)
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
     tap(page);tap(page)
@@ -145,6 +148,7 @@ def test_timeout_and_resume(browser):
 
 def test_restart_mid_attempt(browser):
     page,errs=make_page(browser,pin=False)
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать тренировку').click()
@@ -163,7 +167,7 @@ def test_trainer_relocked_on_reload(browser):
     trainer(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data)
-    restored.get_by_text('Вход в интерфейс тренера').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Вход администратора').wait_for(timeout=5000)
     assert 'Управление занятием' not in restored.locator('body').inner_text()
     assert not errs+errs2,errs+errs2
     restored.close()
@@ -171,6 +175,7 @@ def test_trainer_relocked_on_reload(browser):
 
 def test_intervals_20_taps(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':20,'minTapGapMs':0})
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#attempt-count').select_option('1')
     page.get_by_role('button',name='Начать тренировку').click()
     for _ in range(21):tap(page)
@@ -184,6 +189,7 @@ def test_intervals_20_taps(browser):
 
 def test_min_tap_gap_500ms(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':1,'minTapGapMs':500})
+    page.get_by_role('tab',name='Новое упражнение').click()
     page.locator('#attempt-count').select_option('1')
     page.get_by_role('button',name='Начать тренировку').click()
     tap(page)

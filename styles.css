@@ -11,3 +11,7 @@
 .app-version{font-variant-numeric:tabular-nums}
 .app-footer a{font:inherit;color:inherit;text-decoration:underline}
 @media(max-width:400px){.shell{padding:14px 10px 32px}.panel{padding:14px;margin:12px 0}.chart-wrap{margin-left:-2px;width:calc(100% + 4px)}}
+
+.athlete-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.athlete-tabs button{padding:10px 6px}
+.athlete-tabs [aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#082132}

@@ -6,6 +6,7 @@ from browser_smoke import make_page, tap, trainer
 def test_adult_long_press(browser):
     p,errors=make_page(browser,pin=False,viewport_width=320,mobile=True)
     p.set_viewport_size({'width':320,'height':720})
+    p.get_by_role('tab',name='Новое упражнение').click()
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать тренировку').click()
     tap(p);tap(p)
@@ -88,7 +89,18 @@ def test_chart_5_bars_portrait(browser):
     for width in (320,360,390):
         q,errors=make_page(browser,{'interval-lab:data:v5':data},pin=False,viewport_width=width,mobile=True)
         q.set_viewport_size({'width':width,'height':740})
-        q.get_by_role('button',name='История').first.click()
+        history=q.get_by_role('tab',name='История')
+        exercise=q.get_by_role('tab',name='Новое упражнение')
+        start=q.get_by_role('button',name='Начать тренировку')
+        assert history.get_attribute('aria-selected')=='true'
+        assert not start.is_visible()
+        history.press('ArrowRight')
+        assert exercise.get_attribute('aria-selected')=='true'
+        assert start.is_visible()
+        assert q.locator('footer').count()==1
+        history.click()
+        assert history.get_attribute('aria-selected')=='true'
+        assert not start.is_visible()
         chart=q.locator('.progress-chart .chart')
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
@@ -99,7 +111,7 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.2 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.3 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
@@ -111,7 +123,7 @@ def test_chart_5_bars_portrait(browser):
         q.get_by_role('heading',name='Вход администратора').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
-        q.get_by_role('button',name='Назад').click()
+        assert history.get_attribute('aria-selected')=='true'
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         assert q.get_by_text('Две попытки по умолчанию.',exact=False).count()==0
         assert not errors+errs,errors+errs
