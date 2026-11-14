@@ -43,3 +43,7 @@
 .personal-rest-time{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .attempt-result .display,.personal-rest:not(.half-attempt) .display{font-size:clamp(68px,17vw,116px)}
 @media(min-width:650px){:root{--attempt-height:510px}}
+
+.toolbar .settings-icon{font-size:22px;line-height:1;color:var(--text)}
+.sound-on{color:#78dc9b}
+.sound-off{color:var(--danger)}
