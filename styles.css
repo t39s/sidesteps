@@ -47,8 +47,9 @@
 
 .toolbar .settings-icon{display:inline-block;font-size:22px;line-height:1;color:var(--text)}
 .toolbar button.settings-icon{background:transparent;border-color:transparent}
-.toolbar span.settings-icon{padding:8px 11px}
+.toolbar .settings-return{color:var(--nav-return-color)}
 .gear-glyph{display:inline-block;transform:scale(1.5);pointer-events:none}
-button.nav-return{background:#78dc9b;border-color:#78dc9b;color:#152c20}
+:root{--nav-return-color:#78dc9b}
+button.nav-return{background:var(--nav-return-color);border-color:var(--nav-return-color);color:#152c20}
 .sound-on{color:#78dc9b}
 .sound-off{color:var(--danger)}
