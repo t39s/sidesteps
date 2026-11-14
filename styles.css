@@ -17,7 +17,7 @@
 .settings-title{margin:0;text-align:center}
 .athlete-tabs [aria-selected="true"],.settings-title{background:var(--accent);border-color:var(--accent);color:#082132}
 
-.brand-home{display:block;color:#fff;text-decoration:none}
+.brand-home{display:block;color:var(--nav-return-color);text-decoration:none}
 
 .tap-surface.personal-measure{padding-inline:8px}
 .personal-measure .counter{font-size:clamp(204px,54vw,420px)}
