@@ -1,7 +1,9 @@
-sidesteps v0.2.2-rc.7
-Status: RELEASE CANDIDATE
+sidesteps v0.2.2
+Release date: 2026-11-14
+Status: ACCEPTED STABLE RELEASE
+Accepted candidate: v0.2.2-rc.7 (6e849fc01096e86b2086da5a02ab0168c96622ca)
 Base: v0.2.1 (eb42abd5410adbd661c9abd2dc98b48fc918f4be)
-Branch: develop
+Branch: main
 Changes: separate personal history cards and updated completed workout header; redesigned personal training summary; consistent personal training screens; athlete home with History and New exercise tabs; administrator and athlete roles, two-line exercise title, inline administrator login in athlete footer.
-Publishing: /preview/ through GitHub Actions.
+Publishing: stable / through GitHub Actions.
 Validation evidence: RELEASE_REPORT.md; MANIFEST_SHA256.txt.

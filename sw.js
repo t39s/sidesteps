@@ -1,8 +1,8 @@
 /* sidesteps cache scoped to this PWA path; does not erase legacy Interval Lab caches. */
 const SCOPE_ID = new URL(self.registration.scope).pathname.replace(/[^A-Za-z0-9]/g, '_');
 const PREFIX = 'sidesteps-shell-' + SCOPE_ID + '-';
-const CACHE = PREFIX + 'v0_2_2_rc7';
-const SHELL = ['./','./index.html','./model.js?v=022rc7','./app.js?v=022rc7','./styles.css?v=022rc7','./config.json','./icon.svg','./manifest.webmanifest'];
+const CACHE = PREFIX + 'v0_2_2';
+const SHELL = ['./','./index.html','./model.js?v=022','./app.js?v=022','./styles.css?v=022','./config.json','./icon.svg','./manifest.webmanifest'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(Promise.all([
   caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith(PREFIX) && k !== CACHE).map(k => caches.delete(k)))),
