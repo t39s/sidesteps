@@ -135,7 +135,7 @@ function finalAdult(){
   const points=M.renderChartData(db,workout.athleteId);
   return header('','',true)+card('<h1 class="hero-title center">Тренировка завершена</h1>')+
     card(summary+workoutDetails(workout,M.best(db,workout),true))+
-    card('<h2>Мой прогресс</h2>'+graphic(points.slice(-5)))+
+    card('<h2>Мой прогресс</h2>'+graphic(points,false,recordAsOf(workout.athleteId)))+
     `<div class="buttons">${b('На главную','final-home','wide nav-return')}</div>`;
 }
 function initializeProgressScroll(){
@@ -144,7 +144,7 @@ function initializeProgressScroll(){
   plot.scrollLeft=plot.scrollWidth;
   plot.dataset.positioned='true';
 }
-function graphic(points,scrollable=false){
+function graphic(points,scrollable=false,highlightMs=undefined){
   if(!points.length)return muted('Пока нет завершённых тренировок.');
   const visible=points.slice(scrollable?-100:-5);
   const average=scrollable?points.reduce((mean,p,i)=>mean+(p.ms-mean)/(i+1),0):null;
@@ -155,7 +155,7 @@ function graphic(points,scrollable=false){
   const W=scrollable?visible.length*slot+right:300;
   const floor=H-bottom,plot=H-top-bottom;
   const y=ms=>floor-(ms/hi)*plot;
-  const best=Math.min(...visible.map(p=>p.ms));
+  const best=highlightMs===undefined?Math.min(...visible.map(p=>p.ms)):highlightMs;
   const ticks=[0,.25,.5,.75,1].map(fr=>({
     y:y(hi*fr),
     label:(hi*fr/1000).toFixed(hi<20000?1:0)
@@ -234,7 +234,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
   return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(a=>`<div class="list-row"><span>${esc(a.name)}</span>${b('История','trainer-history','small',`data-id="${esc(a.id)}"`)} ${db.athletes.length>1?b('Удалить','delete-athlete','danger small',`data-id="${esc(a.id)}"`):''}</div>`).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div><label>Мой профиль спортсмена<select id="coach-athlete">${db.athletes.map(a=>`<option value="${esc(a.id)}" ${a.id===db.device.trainerAthleteId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`)+card(`<h2>Добавить архивный результат</h2><p class="note">Историческое время без отдельных попыток. Не редактирует уже измеренные значения.</p><label>Спортсмен<select id="archive-athlete">${options}</select></label><label>Дата<input type="date" id="archive-date"></label><label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label><div class="buttons">${b('Добавить в архив','add-archive','primary')}</div>`)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function pinScreen(){return header()+card(`<h2>Вход администратора</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного администратором, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(renderError)html=card(`<div class="error">${esc(renderError)}</div><div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='settings')html=athleteSettings();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAdminLogin=!renderError&&screen!=='pin'&&screen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.4</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
+function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(renderError)html=card(`<div class="error">${esc(renderError)}</div><div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='settings')html=athleteSettings();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAdminLogin=!renderError&&screen!=='pin'&&screen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.5-rc.1</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -369,13 +369,36 @@ async function handleAction(name,button){try{
  case 'delete-attempt':{if(!trainerUnlocked||!window.confirm('Удалить завершённую попытку? Рекорды будут пересчитаны.'))return;operate(s=>M.deleteRecord(s,'attempt',button.dataset.id,true));render();return;}
  case 'delete-workout':{if(!trainerUnlocked||!window.confirm('Удалить тренировку и завершённые попытки?'))return;operate(s=>M.deleteRecord(s,'workout',button.dataset.id,true));render();return;}
  case 'delete-archived':{if(!trainerUnlocked||!window.confirm('Удалить архивную запись?'))return;operate(s=>M.deleteRecord(s,'archived',button.dataset.id,true));render();return;}
- case 'export-json':{const data=JSON.stringify(exportSnapshot(),null,2);download('sidesteps_backup_v5.json',data,'application/json');return;}
+ case 'export-json':{const data=JSON.stringify(exportSnapshot(),null,2);await download('sidesteps_backup_v5.json',data);return;}
  case 'import-json':$('file-import')?.click();return;
  default:return;
  }
  }catch(e){fail(e);}}
 function exportSnapshot(){if(trainerUnlocked&&db.device.lastInterface==='trainer')return db;const aid=currentAthlete();const n=M.clone(db);n.athletes=n.athletes.filter(a=>a.id===aid);n.workouts=n.workouts.filter(w=>w.athleteId===aid);n.attempts=n.attempts.filter(a=>a.athleteId===aid);n.archived=n.archived.filter(a=>a.athleteId===aid);n.incomplete=n.incomplete.filter(a=>a.athleteId===aid);n.childSessions=[];n.device.selectedAthleteId=aid;n.device.trainerAthleteId=aid;n.device.viewAthleteId=aid;n.device.trainerActivated=false;n.device.lastInterface='athlete';n.device.activeChildSessionId=null;n.device.childParticipants=[];return M.validate(n);}
-function download(filename,content,mime){const blob=new Blob([content],{type:mime});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(link.href),1000);}
+async function download(filename,content){
+  const file=new File([content],filename,{type:'application/json'});
+  const shareData={files:[file]};
+  if(navigator.share&&navigator.canShare?.(shareData)){
+    try{
+      await navigator.share(shareData);
+      return;
+    }catch(error){
+      if(error.name==='AbortError')return;
+    }
+  }
+
+  const url=URL.createObjectURL(file);
+  const link=document.createElement('a');
+  link.href=url;
+  link.download=filename;
+  document.body.append(link);
+  try{
+    link.click();
+  }finally{
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }
+}
 async function importFile(file){if(!file)return;try{let raw=JSON.parse(await file.text());let imported=raw.schemaVersion===5?M.validate(raw):M.migrateV4(raw);let existing=db;
   if(!trainerUnlocked && imported.athletes.length!==1)throw Error('Выберите резервную копию с одной историей тренировок.');
   if(!trainerUnlocked&&db.workouts.length+db.attempts.length>0&&imported.athletes[0].id!==currentAthlete())throw Error('Эта резервная копия не соответствует текущей истории тренировок.');
