@@ -1,17 +1,19 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-test('version appears only as the last footer line',()=>{
+test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/class="app-version">Версия 0\.2\.1<\/div><\/footer>/);
-  assert.doesNotMatch(app,/<span class="mode-tag">[0-9]/);
-  assert.doesNotMatch(get('index.html'),/0\.2\.1/);
-  assert.doesNotMatch(get('manifest.webmanifest'),/0\.2\.1/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.2-rc\.1<\/span>/);
+  assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
+  assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
+  assert.doesNotMatch(get('index.html'),/0\.2\.2/);
+  assert.doesNotMatch(get('manifest.webmanifest'),/0\.2\.2/);
 });
-test('child interface label is Дети; individual child choice remains semantically intact',()=>{
+test('athlete heading and administrator terminology',()=>{
   const app=get('app.js');
-  assert.match(app,/header\('Дети'/);
-  assert.doesNotMatch(app,/header\('Ребёнок'/);
-  assert.match(app,/Нет — один ребёнок/);
+  assert.match(app,/<h1 class="hero-title">Приставные шаги<br>на время<\/h1>/);
+  assert.doesNotMatch(app,/header\('(Спортсмен|Дети|Ребёнок)'/);
+  assert.match(app,/header\('Администратор'/);
+  assert.match(app,/Нет — один участник/);
 });
 test('five latest completed workouts shown as compact vertical bars',()=>{
   const app=get('app.js');

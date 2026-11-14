@@ -31,9 +31,9 @@ def tap(page):
     page.wait_for_timeout(90)
 
 def trainer(page):
-    page.get_by_role('button',name='Тренер').first.click()
+    page.get_by_role('link',name='Войти',exact=True).click()
     page.locator('#pin-input').fill(PIN)
-    page.get_by_role('button',name='Открыть тренерский интерфейс').click()
+    page.get_by_role('button',name='Войти',exact=True).click()
     page.get_by_text('Управление занятием').wait_for(timeout=5000)
 
 def test_adult(browser):
@@ -103,7 +103,7 @@ def test_resume_between_attempts(browser):
 
 def test_pin_no_config(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('button',name='Тренер').first.click()
+    page.get_by_role('link',name='Войти',exact=True).click()
     page.get_by_text('PIN пока не сконфигурирован',exact=False).wait_for(timeout=5000)
     assert 'pin-input' not in page.locator('body').inner_html()
     page.close()

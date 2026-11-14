@@ -50,7 +50,8 @@ def test_child_single_reload_and_early(browser):
     trainer(p)
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать занятие').click()
-    assert p.locator('.mode-tag').first.text_content()=='Дети'
+    assert p.locator('.child .app-head .mode-tag').count()==0
+    assert p.locator('footer').get_by_role('link',name='Войти').is_visible()
     tap(p);tap(p)
     p.get_by_role('button',name='Начать раньше').wait_for(timeout=5000)
     data=p.evaluate('window.__dump()');p.close()
@@ -62,7 +63,8 @@ def test_child_single_reload_and_early(browser):
     restored.mouse.move(bounds['x']+bounds['width']/2,bounds['y']+bounds['height']/2)
     restored.mouse.down();restored.wait_for_timeout(210);restored.mouse.up()
     restored.get_by_text('Попытка 2 из 2').wait_for(timeout=2500)
-    assert restored.locator('.mode-tag').first.text_content()=='Дети'
+    assert restored.locator('.child .app-head .mode-tag').count()==0
+    assert restored.locator('footer').get_by_role('link',name='Войти').is_visible()
     tap(restored);tap(restored)
     restored.get_by_text('Результаты:',exact=False).wait_for(timeout=5000)
     assert not errors+errs,errors+errs
@@ -94,10 +96,22 @@ def test_chart_5_bars_portrait(browser):
         assert q.locator('.chart-wrap').evaluate('(e)=>e.scrollWidth<=e.clientWidth'),width
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
         assert '0' in chart.locator('.svg-txt').first.text_content() or 'с' in chart.locator('.svg-txt').first.text_content()
-        # Visible app version only once and as the last footer line.
-        assert q.locator('.app-version').inner_text()=='Версия 0.2.1'
+        footer=q.locator('footer')
+        version=footer.locator('.app-version')
+        login=footer.get_by_role('link',name='Войти')
+        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.1 · Войти'
+        assert login.get_attribute('title')=='Для администратора'
+        assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
+        assert login.evaluate("(e)=>getComputedStyle(e).font") == version.evaluate("(e)=>getComputedStyle(e).font")
+        assert abs(version.bounding_box()['y']-login.bounding_box()['y'])<1
         assert q.locator('.app-head .brand').inner_text()=='sidesteps'
-        assert q.locator('.app-version').evaluate('(e)=>e===document.querySelector("footer").lastElementChild')
+        login.focus()
+        login.press('Enter')
+        q.get_by_role('heading',name='Вход администратора').wait_for()
+        q.get_by_role('button',name='Назад').click()
+        chart.wait_for()
+        q.get_by_role('button',name='Назад').click()
+        assert q.locator('h1').inner_text()=='Приставные шаги\nна время'
         assert not errors+errs,errors+errs
         q.close()
 

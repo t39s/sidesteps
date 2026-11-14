@@ -1,10 +1,7 @@
-sidesteps v0.2.1
-Release date: 2026-11-14
-Status: ACCEPTED STABLE RELEASE
-Accepted candidate: v0.2.1-rc.1 (7e129ea480dc87b2b95667b2ae41e2242c58b347)
-Branch: main
-Changes: early-start rest button reliability; version only on footer final line; child mode label Дети; compact five-bar progress chart in portrait view.
-Domain model and storage schema: unchanged.
-Known issue KI-001 in v0.2.0: fixed in v0.2.1.
-Publishing: stable / through GitHub Actions.
+sidesteps v0.2.2-rc.1
+Status: RELEASE CANDIDATE
+Base: v0.2.1 (eb42abd5410adbd661c9abd2dc98b48fc918f4be)
+Branch: develop
+Changes: administrator and athlete roles, two-line exercise title, inline administrator login in athlete footer.
+Publishing: /preview/ through GitHub Actions.
 Validation evidence: RELEASE_REPORT.md; MANIFEST_SHA256.txt.
