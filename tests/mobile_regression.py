@@ -101,7 +101,10 @@ def test_chart_5_bars_portrait(browser):
         history.click()
         assert history.get_attribute('aria-selected')=='true'
         assert not start.is_visible()
-        chart=q.locator('.progress-chart .chart')
+        cards=q.get_by_role('tabpanel',name='История').locator(':scope > .panel')
+        assert [cards.nth(i).locator('h2').first.inner_text() for i in range(3)]==[
+            'Текущая тренировка','Мой прогресс','Тренировки']
+        chart=cards.nth(1).locator('.chart')
         chart.wait_for()
         assert chart.locator('rect').count()==5,(width,chart.locator('rect').count())
         assert chart.locator('.chart-bar title').count()==5
@@ -111,7 +114,7 @@ def test_chart_5_bars_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.5 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.2-rc.6 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

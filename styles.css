@@ -16,4 +16,4 @@
 .athlete-tabs button{padding:10px 6px}
 .athlete-tabs [aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#082132}
 
-.brand-home{display:block;text-decoration:none}
+.brand-home{display:block;color:#fff;text-decoration:none}
