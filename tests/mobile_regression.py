@@ -113,13 +113,13 @@ def test_history_chart_portrait(browser):
         assert latest_details.get_by_text('Попытка 1',exact=True).is_visible()
         workouts=cards.nth(2)
         assert workouts.locator('.history-list > .history-item').count()==5
-        workouts.get_by_role('button',name='Все тренировки').click()
+        workouts.get_by_role('button',name='Все тренировки (105)',exact=True).click()
         assert workouts.locator('.history-list > .history-item').count()==104
         latest_date=q.evaluate("window.ILModel.date('2027-01-13T00:00:00.000Z')")
         assert workouts.get_by_text(latest_date,exact=True).count()==0
         workouts.get_by_role('button',name='5 тренировок').click()
         assert workouts.locator('.history-list > .history-item').count()==5
-        assert workouts.get_by_role('button',name='Все тренировки').is_visible()
+        assert workouts.get_by_role('button',name='Все тренировки (105)',exact=True).is_visible()
         chart=cards.nth(1).locator('.chart')
         chart.wait_for()
         assert chart.locator('rect').count()==100,(width,chart.locator('rect').count())
@@ -140,7 +140,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.4-rc.1 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.4-rc.2 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
