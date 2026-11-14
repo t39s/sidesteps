@@ -95,7 +95,7 @@ def test_chart_5_bars_portrait(browser):
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
         assert '0' in chart.locator('.svg-txt').first.text_content() or 'с' in chart.locator('.svg-txt').first.text_content()
         # Visible app version only once and as the last footer line.
-        assert q.locator('.app-version').inner_text()=='v0.2.1-rc.1'
+        assert q.locator('.app-version').inner_text()=='Версия 0.2.1'
         assert q.locator('.app-head .brand').inner_text()=='sidesteps'
         assert q.locator('.app-version').evaluate('(e)=>e===document.querySelector("footer").lastElementChild')
         assert not errors+errs,errors+errs

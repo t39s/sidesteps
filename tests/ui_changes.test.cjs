@@ -2,10 +2,10 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('version appears only as the last footer line',()=>{
   const app=get('app.js');
-  assert.match(app,/class="app-version">Версия 0\.2\.1-rc\.1<\/div><\/footer>/);
+  assert.match(app,/class="app-version">Версия 0\.2\.1<\/div><\/footer>/);
   assert.doesNotMatch(app,/<span class="mode-tag">[0-9]/);
-  assert.doesNotMatch(get('index.html'),/v0\.2\.1/);
-  assert.doesNotMatch(get('manifest.webmanifest'),/v0\.2\.1/);
+  assert.doesNotMatch(get('index.html'),/0\.2\.1/);
+  assert.doesNotMatch(get('manifest.webmanifest'),/0\.2\.1/);
 });
 test('child interface label is Дети; individual child choice remains semantically intact',()=>{
   const app=get('app.js');
