@@ -53,6 +53,14 @@ jobs:
             cp "stable-src/$name" "public/$name"
             cp "preview-src/$name" "public/preview/$name"
           done
+          if [ -f stable-src/migration.js ]; then
+            node --check stable-src/migration.js
+            cp stable-src/migration.js public/migration.js
+          fi
+          if [ -f preview-src/migration.js ]; then
+            node --check preview-src/migration.js
+            cp preview-src/migration.js public/preview/migration.js
+          fi
           touch public/.nojekyll
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -77,12 +85,12 @@ jobs:
           fetch-depth: 0
       - name: Create immutable release tag if absent
         run: |
-          grep -qx 'sidesteps v0.2.5' <(head -n 1 RELEASE_INFO.txt)
-          if git ls-remote --exit-code origin refs/tags/v0.2.5; then
-            echo 'v0.2.5 already exists; no change to tag.'
+          grep -qx 'sidesteps v0.2.6' <(head -n 1 RELEASE_INFO.txt)
+          if git ls-remote --exit-code origin refs/tags/v0.2.6; then
+            echo 'v0.2.6 already exists; no change to tag.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a v0.2.5 -m 'sidesteps v0.2.5 — accepted stable baseline'
-          git push origin refs/tags/v0.2.5
+          git tag -a v0.2.6 -m 'sidesteps v0.2.6 — accepted stable baseline'
+          git push origin refs/tags/v0.2.6

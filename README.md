@@ -1,4 +1,4 @@
-# sidesteps v0.2.5 — стабильная версия
+# sidesteps v0.2.6 — стабильная версия
 
 **Статус: стабильный выпуск в `main`.** Изменения и проверки: `RELEASE_REPORT.md`; ограничения: `KNOWN_ISSUES.md`.
 
@@ -79,4 +79,4 @@
 6. При одновременной работе в двух вкладках показано уведомление о конфликте, но отсутствует транзакционная защита от гонок между вкладками. Работайте в одной вкладке.
 7. PIN-ограничение — UX-защита от случайных действий спортсмена, а не информационно-безопасная авторизация.
 
-**Исторический источник:** [`t39s/dev-sandbox/interval-lab`](https://github.com/t39s/dev-sandbox/tree/main/interval-lab), baseline 1.4.3. **Текущая стабильная baseline:** sidesteps v0.2.5 в ветке `main`. Известные проблемы: [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
+**Исторический источник:** [`t39s/dev-sandbox/interval-lab`](https://github.com/t39s/dev-sandbox/tree/main/interval-lab), baseline 1.4.3. **Текущая стабильная baseline:** sidesteps v0.2.6 в ветке `main`. Известные проблемы: [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md).
