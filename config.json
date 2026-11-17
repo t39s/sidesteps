@@ -1,6 +1,6 @@
 {
   "minTapGapMs": 500,
-  "intervalCount": 20,
+  "intervalCount": 4,
   "restDurationSec": 120,
   "resultDisplaySec": 10,
   "audioPolicy": "user-controllable",
