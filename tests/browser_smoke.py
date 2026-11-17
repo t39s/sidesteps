@@ -22,6 +22,7 @@ def make_page(browser, data=None, pin=True, config_overrides=None, viewport_widt
     page.evaluate(js)
     page.add_style_tag(content=(ROOT/'styles.css').read_text())
     page.add_script_tag(content=(ROOT/'model.js').read_text())
+    page.add_script_tag(content=(ROOT/'migration.js').read_text())
     page.add_script_tag(content=(ROOT/'app.js').read_text())
     page.get_by_role('tab',name='История').wait_for(timeout=5000) if not data else page.wait_for_timeout(350)
     return page,errors
@@ -36,24 +37,48 @@ def trainer(page):
     page.get_by_role('button',name='Войти',exact=True).click()
     page.get_by_text('Управление занятием').wait_for(timeout=5000)
 
+def new_exercise(page, attempts=None, mode=None):
+    if attempts is not None or mode is not None:
+        page.get_by_role('button',name='Настройки',exact=True).click()
+        if attempts is not None:
+            page.locator('#attempt-count').select_option(str(attempts))
+        if mode is not None:
+            page.locator('#mode-select').select_option(mode)
+        page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('tab',name='Новая тренировка').click()
+
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
-    exercise=page.get_by_role('tab',name='Новое упражнение')
-    exercise.click()
+    page.get_by_role('tab',name='Новая тренировка').click()
+    page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
+    assert page.locator('.tap-surface').get_by_text('0 / 1 интервалов',exact=True).is_visible()
+    state=page.evaluate('window.__dump()')
+    assert not json.loads(state['interval-lab:data:v5'])['workouts']
+
+    page.get_by_role('button',name='Настройки',exact=True).click()
+    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка']
+    assert page.get_by_role('button',name='Звук',exact=True).is_visible()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'
     assert mode.locator('option:checked').inner_text()=='1 отсечка (по умолчанию)'
-    mode.select_option('stopwatch')
-    page.get_by_role('tab',name='История').click()
-    exercise.click()
-    assert mode.input_value()=='intervals'
     page.locator('#attempt-count').select_option('1')
-    page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Начать тренировку').click()
-    page.get_by_text('Попытка 1 из 1').wait_for()
+    mode.select_option('stopwatch')
+    page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
+    assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
+
+    data=page.evaluate('window.__dump()')
+    page.close()
+    page,reopened_errors=make_page(browser,data,pin=False)
+    page.get_by_role('tab',name='Новая тренировка').click()
+    page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
+    assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
     tap(page);tap(page)
-    page.get_by_text('Тренировка завершена').wait_for(timeout=5000)
+    page.get_by_text('Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    assert not reopened_errors,reopened_errors
+    assert len(state['workouts'])==1
+    assert state['attempts'][0]['mode']=='stopwatch'
     assert state['attempts'][0]['status']=='completed',state
     assert state['workouts'][0]['status']=='completed'
     assert state['attempts'][0]['totalMs']>0
@@ -129,16 +154,14 @@ def test_pin_no_config(browser):
 
 def test_rest_and_early_start(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
-    page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Начать тренировку').click()
+    new_exercise(page, mode='stopwatch')
     page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
     assert page.get_by_role('button',name='История',exact=True).count()==0
     tap(page);tap(page)
     page.get_by_text('Попытка 1',exact=True).wait_for()
     assert page.get_by_role('heading',name='Попытка 1',exact=True).is_visible()
     assert page.locator('.attempt-result .display').inner_text().split(',')[1].endswith(' с')
-    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==2
+    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==3
     result_button_width=page.get_by_role('button',name='Начать раньше').bounding_box()['width']
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
@@ -163,16 +186,14 @@ def test_rest_and_early_start(browser):
 
 def test_timeout_and_resume(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
-    page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Начать тренировку').click()
+    new_exercise(page, mode='stopwatch')
     tap(page);tap(page)
     data=page.evaluate('window.__dump()')
     page.close()
     restored,errs=make_page(browser,data,pin=False)
     # Restore during rest and advance wall-clock by >5 minutes, without starting attempt #2.
     restored.evaluate('Date.now = (()=>{let d=Date.now;return ()=>d()+310000;})()')
-    restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert state['workouts'][0]['status']=='completed'
     assert state['workouts'][0]['closeReason']=='timeout'
@@ -182,10 +203,7 @@ def test_timeout_and_resume(browser):
 
 def test_restart_mid_attempt(browser):
     page,errs=make_page(browser,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
-    page.locator('#attempt-count').select_option('1')
-    page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Начать тренировку').click()
+    new_exercise(page, attempts=1, mode='stopwatch')
     tap(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data,pin=False)
@@ -209,11 +227,16 @@ def test_trainer_relocked_on_reload(browser):
 
 def test_intervals_20_taps(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':20,'minTapGapMs':0})
-    page.get_by_role('tab',name='Новое упражнение').click()
-    page.locator('#attempt-count').select_option('1')
-    page.get_by_role('button',name='Начать тренировку').click()
-    for _ in range(21):tap(page)
-    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    new_exercise(page, attempts=1)
+    counter=page.locator('.personal-measure .counter')
+    assert counter.locator('.play-glyph').is_visible()
+    assert page.get_by_text('0 / 20 интервалов',exact=True).is_visible()
+    tap(page)
+    assert counter.inner_text()=='0'
+    tap(page)
+    assert counter.inner_text()=='1'
+    for _ in range(19):tap(page)
+    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert len(state['attempts'])==1
     assert len(state['attempts'][0]['intervalsMs'])==20
@@ -223,16 +246,14 @@ def test_intervals_20_taps(browser):
 
 def test_min_tap_gap_500ms(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':1,'minTapGapMs':500})
-    page.get_by_role('tab',name='Новое упражнение').click()
-    page.locator('#attempt-count').select_option('1')
-    page.get_by_role('button',name='Начать тренировку').click()
+    new_exercise(page, attempts=1)
     tap(page)
     # 90ms elapsed is rejected
     tap(page)
     assert page.get_by_text('Тренировка завершена').count()==0
     page.wait_for_timeout(480)
     tap(page)
-    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors,errors
     page.close()
 

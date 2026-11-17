@@ -1,8 +1,7 @@
-sidesteps v0.2.6
-Release date: 2026-11-15
+sidesteps v0.2.7
+Release date: 2026-11-17
 Status: STABLE RELEASE
-Base: v0.2.5 (fe9eba9f8f035dc78c50122912e4c10dff80c443)
-Migration receiver: df0f6f63b6ba64cb97afe4c528a8a57bde90b9df (PR #1)
+Base: v0.2.6 (5304c95be9ac64a825f53fac00058c47219b2ccb)
+Accepted candidate: v0.2.7-rc.8 (968334e9e702a4ccc80e3256c6b78e9c86702265)
 Branch: main
 Publishing: stable / through GitHub Actions.
-Validation evidence: RELEASE_REPORT.md; MANIFEST_SHA256.txt.
