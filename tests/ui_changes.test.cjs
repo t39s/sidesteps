@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.8-rc\.1<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -31,17 +31,22 @@ test('rest clock updates without replacing touch targets every tick',()=>{
   assert.match(app,/restBypassedWorkout=w\?\.id/);
 });
 
-test('last solo result is displayed in milliseconds and voiced in tenths before the training summary',async()=>{
+for(const pause of [5,7])test(`solo result waits ${pause} seconds after speech and retains precise results`,async()=>{
   const vm=require('node:vm');
   const M=require('../model.js');
-  const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0};
+  const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0,resultPauseSec:pause};
   const appEvents={},documentEvents={},spoken=[];
   let initial=M.blank();
   initial.device.soloPlannedAttempts=1;
   let state=JSON.stringify(initial),now=1000,clock=Date.now(),tick,showResult;
   class TestDate extends Date { static now(){return clock;} }
   const app={innerHTML:'',querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
-  const speechSynthesis={cancel(){},speak:utterance=>{spoken.push(utterance.text);utterance.onend();}};
+  let heldSpeech=null,holdSpeech=true;
+  const speechSynthesis={cancel(){},speak:utterance=>{
+    spoken.push(utterance.text);
+    if(holdSpeech)heldSpeech=utterance;
+    else utterance.onend();
+  }};
   function SpeechSynthesisUtterance(text){this.text=text;}
   vm.runInNewContext(get('app.js'),{
     window:{ILModel:M,SideMigration:{run:()=>({})},addEventListener(){},speechSynthesis,SpeechSynthesisUtterance},
@@ -72,7 +77,13 @@ test('last solo result is displayed in milliseconds and voiced in tenths before 
   showResult();
   assert.match(app.innerHTML,/Попытка 1<\/h1>/);
   assert.match(app.innerHTML,/class="display">1,446 с/);
-  clock+=config.resultDisplaySec*1000-1;
+  clock+=20000;
+  tick();
+  assert.match(app.innerHTML,/Попытка 1<\/h1>/);
+  holdSpeech=false;
+  heldSpeech.onend();
+  tick();
+  clock+=config.resultPauseSec*1000-1;
   tick();
   assert.match(app.innerHTML,/Попытка 1<\/h1>/);
   clock++;
@@ -96,7 +107,8 @@ test('last solo result is displayed in milliseconds and voiced in tenths before 
     documentEvents.pointerup(touch(2));
     assert.equal(spoken[utteranceIndex],expected);
     showResult();
-    clock+=config.resultDisplaySec*1000;
+    tick();
+    clock+=config.resultPauseSec*1000;
     tick();
   }
 });
