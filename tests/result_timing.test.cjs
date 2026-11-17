@@ -9,7 +9,7 @@ function fixture(state,soundEnabled=false){
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>1000},
@@ -88,4 +88,33 @@ test('display config requires both perception durations',()=>{
   const f=fixture(M.blank());assert.ok(f.api.validateConfig(config));
   for(const key of ['resultDisplaySec','recordDisplaySec'])assert.throws(()=>f.api.validateConfig({...config,[key]:0}));
   assert.equal(config.intervalCount,4);assert.equal(config.restDurationSec,15);assert.ok(!('resultPauseSec'in config));
+});
+
+test('trainer uses athlete measurement layout with participant identity',()=>{
+  let s=M.blank();s=M.startChild(s,['athlete-default'],2).state;
+  const f=fixture(s);const ready=f.api.childReady();
+  assert.match(ready,/hero-title center">Попытка 1 из 2/);
+  assert.match(ready,/participant-name">Спортсмен/);
+  assert.match(ready,/personal-measure/);assert.match(ready,/play-glyph/);
+  assert.match(ready,/data-elapsed>0,0 с/);
+  const {state,result}=finish({child:true,planned:2});const r=fixture(state);
+  r.api.afterFinished(result,false,null);
+  assert.match(r.app.innerHTML,/attempt-result half-attempt/);
+  assert.match(r.app.innerHTML,/personal-rest half-attempt/);
+  const rest=r.api.restScreen(true,result.workout);
+  assert.match(rest,/hero-title center">Отдых/);
+  assert.match(rest,/personal-rest/);assert.match(rest,/participant-name">Спортсмен/);
+});
+test('trainer final summary preserves participant selector and workout details',()=>{
+  let s=M.blank();const added=M.addAthlete(s,'Б');s=added.state;
+  s=M.startChild(s,['athlete-default',added.value.id],1).state;
+  for(let i=0;i<2;i++){
+    const a=M.startAttempt(s,M.nextTurn(s).workoutId,'stopwatch',4);s=a.state;
+    s=M.finishAttempt(s,a.value.id,1500+i*100,[]).state;
+  }
+  const f=fixture(s);const html=f.api.childFinal();
+  assert.match(html,/hero-title center">Тренировка завершена/);
+  assert.equal((html.match(/data-act="child-view"/g)||[]).length,2);
+  assert.match(html,/Мой прогресс/);assert.match(html,/1,600/);
+  assert.match(html,/data-act="history-child"/);
 });

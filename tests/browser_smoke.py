@@ -107,7 +107,7 @@ def test_child_pair(browser):
     page.locator('#mode-select').select_option('stopwatch')
     page.get_by_role('button',name='Начать занятие').click()
     page.get_by_text('Попытка 1 из 1').wait_for()
-    assert 'Спортсмен' in page.locator('.screen-heading').inner_text()
+    assert 'Спортсмен' in page.locator('.participant-name').inner_text()
     tap(page);tap(page)
     page.get_by_text('Следующий участник появится автоматически').wait_for(timeout=5000)
     # Move resultDisplaySec threshold forward without waiting 5 real seconds.
@@ -115,9 +115,9 @@ def test_child_pair(browser):
     page.get_by_text('Маша',exact=True).first.wait_for(timeout=5000)
     page.get_by_text('Попытка 1 из 1').wait_for(timeout=5000)
     tap(page);tap(page)
-    page.get_by_text('Маша · Попытка 1').wait_for(timeout=5000)
+    page.locator('.attempt-result').wait_for(timeout=5000)
     page.evaluate('Date.now = (()=>{let original=Date.now;return ()=>original()+10000;})()')
-    page.get_by_text('Результаты: Маша').wait_for(timeout=5000)
+    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
     assert page.locator('button[data-act="child-view"]').count()==2
     assert not errors,errors
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
@@ -137,13 +137,13 @@ def test_resume_between_attempts(browser):
     tap(page);tap(page)
     page.evaluate('Date.now = (()=>{let original=Date.now;return ()=>original()+10000;})()')
     page.get_by_text('Попытка 1 из 2').wait_for(timeout=5000)
-    assert 'Маша' in page.locator('.screen-heading').inner_text()
+    assert 'Маша' in page.locator('.participant-name').inner_text()
     tap(page);tap(page)
     # Refresh using new page and persisted storage before next transition.
     data=page.evaluate('window.__dump()');page.close()
     restored,errs=make_page(browser,data)
     restored.get_by_text('Попытка 2 из 2').wait_for(timeout=5000)
-    assert 'Спортсмен' in restored.locator('.screen-heading').inner_text()
+    assert 'Спортсмен' in restored.locator('.participant-name').inner_text()
     assert not errors+errs,errors+errs
     restored.close()
 

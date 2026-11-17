@@ -39,7 +39,7 @@ def test_child_early_without_reload(browser):
     p.mouse.down();p.wait_for_timeout(220);p.mouse.up()
     p.get_by_text('Попытка 2 из 2').wait_for(timeout=2500)
     tap(p);tap(p)
-    p.get_by_text('Результаты:',exact=False).wait_for(timeout=6500)
+    p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors,errors
     p.close()
 
@@ -65,7 +65,7 @@ def test_child_single_reload_and_early(browser):
     assert restored.locator('.child .app-head .mode-tag').count()==0
     assert restored.locator('footer').get_by_role('link',name='Войти').is_visible()
     tap(restored);tap(restored)
-    restored.get_by_text('Результаты:',exact=False).wait_for(timeout=6500)
+    restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors+errs,errors+errs
     restored.close()
 

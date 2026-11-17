@@ -134,9 +134,11 @@ function measureSurface(personal=false,mode=db.device.measurementMode){const run
   const counter=showPlay
     ?'<div class="counter counter-ready" aria-hidden="true"><span class="play-glyph"></span></div>'
     :`<div class="counter" data-digits="${String(intervals).length}">${intervals}</div>`;
-  const sec=elapsedSeconds(running?performance.now()-run.start:0,personal);return `<div class="tap-surface${personal?' personal-measure':''}" data-tap="1" role="button" tabindex="0" aria-label="${running?'Отсечка или стоп':'Начать измерение'}">${personal&&mode==='intervals'?'':`<div class="muted">${mode==='intervals'?'С ОТСЕЧКАМИ':'СТАРТ–СТОП'}</div>`}${mode==='intervals'?`${counter}<div class="${personal?'secondary-display':'note'}">${intervals} / ${run?run.target:config.intervalCount} интервалов</div>`:'<div style="height:26px"></div>'}<div class="secondary-display" data-elapsed>${sec} с</div>${personal&&mode==='intervals'?'':`<div class="muted" style="margin-top:20px">${running?(mode==='intervals'?'КОСНИСЬ ДЛЯ ОТСЕЧКИ':'КОСНИСЬ ДЛЯ СТОПА'):'КОСНИСЬ ДЛЯ СТАРТА'}</div>`}</div>`;}
+  const sec=elapsedSeconds(running?performance.now()-run.start:0,true);return `<div class="tap-surface${personal?' personal-measure':''}" data-tap="1" role="button" tabindex="0" aria-label="${running?'Отсечка или стоп':'Начать измерение'}">${personal&&mode==='intervals'?'':`<div class="muted">${mode==='intervals'?'С ОТСЕЧКАМИ':'СТАРТ–СТОП'}</div>`}${mode==='intervals'?`${counter}<div class="${personal?'secondary-display':'note'}">${intervals} / ${run?run.target:config.intervalCount} интервалов</div>`:'<div style="height:26px"></div>'}<div class="secondary-display" data-elapsed>${sec} с</div>${personal&&mode==='intervals'?'':`<div class="muted" style="margin-top:20px">${running?(mode==='intervals'?'КОСНИСЬ ДЛЯ ОТСЕЧКИ':'КОСНИСЬ ДЛЯ СТОПА'):'КОСНИСЬ ДЛЯ СТАРТА'}</div>`}</div>`;}
 function childReady(){const c=M.currentChild(db);if(!c)return childFinal();const turn=M.nextTurn(db);if(!turn)return childFinal();const w=M.workoutOf(db,turn.workoutId);if(c.athleteIds.length===1&&turn.ordinal===2&&w?.firstEndedAt&&config){const restLeft=remainingRest(w);if(restLeft>0&&restBypassedWorkout!==w.id)return restScreen(true,w);}
-  return `<div class="child">${header()}<div class="screen-heading">${esc(athlete(turn.athleteId).name)}</div><div class="center muted">Попытка ${turn.ordinal} из ${c.plannedAttempts}</div>${measureSurface()}${muted('Только ваш секундомер. Смена участников происходит автоматически.')}</div>`;}
+  return header()+card(`<h1 class="hero-title center">Попытка ${turn.ordinal} из ${c.plannedAttempts}</h1><div class="center muted participant-name">${esc(athlete(turn.athleteId).name)}</div>`)+measureSurface(true);
+}
+
 function personalRestCard(workout,compact=false){
   return card(`<div class="personal-rest-time">
     ${compact?'<div class="hero-title center" role="heading" aria-level="2">Отдых</div>':''}
@@ -148,26 +150,32 @@ function resultScreen(){
   if(!a)return screen==='result'?(isChild()?childReady():soloReady()):'';
   const w=M.workoutOf(db,a.workoutId),c=M.currentChild(db);
   const rests=w.status==='pending'&&w.plannedAttempts===2;
-  if(!isChild()){
-    const title=card(`<h1 class="hero-title center">Попытка ${a.ordinal}</h1>`);
-    const result=card(`<div class="display">${M.fmt(a.totalMs)}</div>${a.recordEvent?'<div class="record">★ Новый рекорд!</div>':''}`,'attempt-result half-attempt');
-    return header()+title+result+(rests?personalRestCard(w,true):'');
-  }
-  const participant=`${esc(athlete(a.athleteId).name)} · `;
-  const result=`<div class="center"><div class="muted">${participant}Попытка ${a.ordinal}</div><div class="display">${M.fmt(a.totalMs)}</div>${a.recordEvent?'<div class="record">★ Новый рекорд!</div>':''}</div>`;
-  const firstPart=header()+result;
-  if(c?.athleteIds.length===2)return firstPart+card(`<div class="center muted">Следующий участник появится автоматически</div>`);
-  if(rests)return firstPart+card(`<div class="center">Отдых <strong class="secondary-display" data-rest-clock>${M.mins(remainingRest(w))}</strong></div><div class="buttons">${b('Начать раньше','rest-early','primary wide')}</div>`);
-  return firstPart;
+  const participant=isChild()?`<div class="center muted participant-name">${esc(athlete(a.athleteId).name)}</div>`:'';
+  const title=card(`<h1 class="hero-title center">Попытка ${a.ordinal}</h1>${participant}`);
+  const result=card(`<div class="display">${M.fmt(a.totalMs)}</div>${a.recordEvent?'<div class="record">★ Новый рекорд!</div>':''}`,'attempt-result half-attempt');
+  const paired=c?.athleteIds.length===2;
+  return header()+title+result+(paired?card('<div class="center muted">Следующий участник появится автоматически</div>'):rests?personalRestCard(w,true):'');
 }
 function restScreen(child,w){
   if(!w)return adultHome();
-  if(child)return participantRest(w);
-  return header()+card('<h1 class="hero-title center">Отдых</h1>')+personalRestCard(w);
+  return header()+card(`<h1 class="hero-title center">Отдых</h1>${child?`<div class="center muted participant-name">${esc(athlete(w.athleteId).name)}</div>`:''}`)+personalRestCard(w);
 }
-function participantRest(w){return `<div class="child">${header()}<div class="fullscreen-rest"><div class="screen-heading">Отдых</div><div class="display" data-rest-clock>${M.mins(remainingRest(w))}</div><div class="muted">${esc(athlete(w.athleteId).name)}</div><div class="buttons">${b('Начать раньше','rest-early','primary wide')}</div></div></div>`;}
+
 function latestChildSession(){const candidates=db.childSessions.filter(c=>c.status!=='active');return candidates.at(-1)||null;}
-function childFinal(){const active=M.currentChild(db);if(active)return childReady();const allowed=db.device.childParticipants;if(!allowed.length)return header()+card('<h2>Сеанс не выбран</h2><p>Администратор должен выбрать участника.</p>');let aid=db.device.viewAthleteId;if(!allowed.includes(aid))aid=allowed.at(-1);return `<div class="child">${header()}<h1 class="hero-title">Результаты: ${esc(athlete(aid).name)}</h1>${allowed.length===2?`<div class="buttons">${allowed.map(x=>b(esc(athlete(x).name),'child-view','soft',`data-id="${esc(x)}"`)).join('')}</div>`:''}${progress(aid,true)}${b('История','history-child','wide')}</div>`;}
+function childFinal(){
+  if(M.currentChild(db))return childReady();
+  const allowed=db.device.childParticipants;
+  if(!allowed.length)return header()+card('<h2>Сеанс не выбран</h2><p>Администратор должен выбрать участника.</p>');
+  const aid=allowed.includes(db.device.viewAthleteId)?db.device.viewAthleteId:allowed.at(-1);
+  const session=latestChildSession();
+  const workout=session?.workoutIds.map(id=>M.workoutOf(db,id)).find(w=>w?.athleteId===aid);
+  const summary=workout?card(workoutSummary(aid,workout)+workoutDetails(workout,M.best(db,workout),true)):'';
+  return header()+card(`<h1 class="hero-title center">Тренировка завершена</h1><div class="center muted participant-name">${esc(athlete(aid).name)}</div>`)+
+    (allowed.length===2?`<div class="buttons">${allowed.map(x=>b(esc(athlete(x).name),'child-view','soft',`data-id="${esc(x)}"`)).join('')}</div>`:'')+
+    summary+card('<h2>Мой прогресс</h2>'+graphic(M.renderChartData(db,aid),false,recordAsOf(aid)))+
+    `<div class="buttons">${b('История','history-child','wide nav-return')}</div>`;
+}
+
 function finalAdult(){
   const workout=M.workoutOf(db,viewId);
   if(!workout)return adultHome();
@@ -277,7 +285,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
   return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(a=>`<div class="list-row"><span>${esc(a.name)}</span>${b('История','trainer-history','small',`data-id="${esc(a.id)}"`)} ${db.athletes.length>1?b('Удалить','delete-athlete','danger small',`data-id="${esc(a.id)}"`):''}</div>`).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div><label>Мой профиль спортсмена<select id="coach-athlete">${db.athletes.map(a=>`<option value="${esc(a.id)}" ${a.id===db.device.trainerAthleteId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`)+card(`<h2>Добавить архивный результат</h2><p class="note">Историческое время без отдельных попыток. Не редактирует уже измеренные значения.</p><label>Спортсмен<select id="archive-athlete">${options}</select></label><label>Дата<input type="date" id="archive-date"></label><label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label><div class="buttons">${b('Добавить в архив','add-archive','primary')}</div>`)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function pinScreen(){return header()+card(`<h2>Вход администратора</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного администратором, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.9-rc.1</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
+function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.9-rc.2</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -340,23 +348,18 @@ function tap(releasePointerId=null){
   const now=performance.now();
   if(!run){
     startMeasurement();
-    if(personal&&run)flashPersonalTap();
+    if(run)flashPersonalTap();
     return;
   }
   if(now-run.lastAccepted<=config.minTapGapMs)return;
   run.lastAccepted=now;
-  if(!personal){
-    const zone=app.querySelector('.tap-surface');
-    zone?.classList.add('flash');
-    setTimeout(()=>zone?.classList.remove('flash'),150);
-  }
   if(run.mode==='intervals'){
     const elapsed=run.intervals.reduce((total,ms)=>total+ms,0);
     run.intervals.push(Math.max(0,Math.round(now-run.start-elapsed)));
   }
   const finished=run.mode==='stopwatch'||run.intervals.length===run.target;
   if(!finished||(personal&&run.mode==='intervals'))render();
-  if(personal)flashPersonalTap();
+  flashPersonalTap();
   if(finished)completeMeasurement(now,personal,releasePointerId);
 }
 function resultProgress(){if(screen!=='result')return;const a=M.attemptOf(db,lastResultId);if(!a)return;const w=M.workoutOf(db,a.workoutId);
@@ -388,8 +391,8 @@ function tick(){
     const c=M.currentChild(db),turn=M.nextTurn(db);
     const w=c?M.workoutOf(db,turn?.workoutId):null;
     if(c?.athleteIds.length===1 && turn?.ordinal===2 && w?.firstEndedAt && restBypassedWorkout!==w.id){
-      if(remainingRest(w)>0 && app.querySelector('.fullscreen-rest')){screen='rest';}
-      else if(app.querySelector('.fullscreen-rest')){queueVoice('Можно начинать');render();return;}
+      if(remainingRest(w)>0 && app.querySelector('[data-rest-clock]')){screen='rest';}
+      else if(app.querySelector('[data-rest-clock]')){queueVoice('Можно начинать');render();return;}
     }
   }
   // Update only text nodes: replacing the button mid-touch could lose the click.
@@ -397,7 +400,7 @@ function tick(){
   if(clock){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);if(w)clock.textContent=M.mins(remainingRest(w));}
   if(run && (screen==='athlete-ready'||screen==='child-ready')){
     const elapsed=app.querySelector('[data-elapsed]');
-    if(elapsed)elapsed.textContent=elapsedSeconds(performance.now()-run.start,screen==='athlete-ready')+' с';
+    if(elapsed)elapsed.textContent=elapsedSeconds(performance.now()-run.start,true)+' с';
   }
 }
 async function handleAction(name,button){try{
