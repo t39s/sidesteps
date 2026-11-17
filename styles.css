@@ -21,10 +21,10 @@
 
 .tap-surface.personal-measure{padding-inline:8px}
 .personal-measure .counter{font-size:clamp(204px,54vw,420px)}
-.counter-ready{display:grid;place-items:center;height:1em;filter:drop-shadow(0 0 .035em #ffd166);animation:play-glow 1.8s ease-in-out infinite}
+.counter-ready{display:grid;place-items:center;height:1em;animation:play-glow .5s steps(1,end) infinite}
 @keyframes play-glow{
-  0%,100%{filter:drop-shadow(0 0 .025em #ffd16680)}
-  50%{filter:drop-shadow(0 0 .065em #ffd166)}
+  0%{filter:drop-shadow(0 0 .065em #ffd166) drop-shadow(0 0 .065em #ffd166) drop-shadow(0 0 .065em #ffd166) drop-shadow(0 0 .065em #ffd166)}
+  40%,100%{filter:none}
 }
 .play-glyph{width:.5em;height:.58em;background:currentColor;clip-path:polygon(0 0,100% 50%,0 100%);transform:translateX(10%)}
 .personal-measure:active:not(.flash){background:radial-gradient(circle at 50% 38%,#1a3f57,#0c1d30 70%);color:var(--text)}
