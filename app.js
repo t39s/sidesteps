@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const M=window.ILModel,$=id=>document.getElementById(id),app=$('app');
-let settingsFrom='athlete',settingsDraft=[],restWarningWorkout=null;
+let settingsFrom='athlete',settingsDraft=[],restWarningWorkout=null,pendingAttemptVoice=null;
 let db=null,config=null,screen='boot',run=null,viewId=null,lastResultId=null,resultUntil=0,trainerUnlocked=false,returnFromHistory='athlete',returnFromPin=null,showAll=false,showAllPersonal=false,personalFlashTimer=null,voiceSerial=0,voicePending=0,voiceNow=null,voiceQueue=[],voiceWaiters=[],toastTimeout=null,renderError=null,restBypassedWorkout=null,wakeLock=null;
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el=(tag,attrs='',body='')=>`<${tag} ${attrs}>${body}</${tag}>`;
@@ -32,7 +32,7 @@ function message(s){const t=$('toast');t.textContent=s;t.style.display='block';c
 function fail(e){console.error(e);message(e?.message||String(e));}
 function operate(action){const r=action(db);localStorage.setItem(M.KEY,JSON.stringify(r.state));db=r.state;return r.value;}
 function change(f){return operate(s=>M.mutation(s,f));}
-function resetVoice(){voiceSerial++;voiceQueue=[];voiceNow=null;voicePending=0;try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch(e){}voiceWaiters.splice(0).forEach(f=>f());}
+function resetVoice(){pendingAttemptVoice=null;voiceSerial++;voiceQueue=[];voiceNow=null;voicePending=0;try{if('speechSynthesis'in window)speechSynthesis.cancel();}catch(e){}voiceWaiters.splice(0).forEach(f=>f());}
 function speechDone(){return voicePending===0?Promise.resolve():new Promise(r=>voiceWaiters.push(r));}
 function updateSpeechWaiters(){if(voicePending===0)voiceWaiters.splice(0).forEach(f=>f());}
 function queueVoice(text){if(!sound()||!('speechSynthesis' in window)||!('SpeechSynthesisUtterance' in window))return;const token=voiceSerial;voicePending++;voiceQueue.push({text,token});if(!voiceNow)drainSpeech();}
@@ -249,7 +249,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
   return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(a=>`<div class="list-row"><span>${esc(a.name)}</span>${b('История','trainer-history','small',`data-id="${esc(a.id)}"`)} ${db.athletes.length>1?b('Удалить','delete-athlete','danger small',`data-id="${esc(a.id)}"`):''}</div>`).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div><label>Мой профиль спортсмена<select id="coach-athlete">${db.athletes.map(a=>`<option value="${esc(a.id)}" ${a.id===db.device.trainerAthleteId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`)+card(`<h2>Добавить архивный результат</h2><p class="note">Историческое время без отдельных попыток. Не редактирует уже измеренные значения.</p><label>Спортсмен<select id="archive-athlete">${options}</select></label><label>Дата<input type="date" id="archive-date"></label><label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label><div class="buttons">${b('Добавить в архив','add-archive','primary')}</div>`)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function pinScreen(){return header()+card(`<h2>Вход администратора</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного администратором, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.7-rc.3</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
+function render(){if(!db)return;const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.7-rc.4</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -264,9 +264,13 @@ function go(newScreen,lastInterface=null){if(lastInterface){change(n=>{n.device.
   }
   screen=newScreen;render();}
 function bestPreviousBeforeAttempt(a){return a.recordEvent;}
-function afterFinished(result,personal=false){lastResultId=result.attempt.id;viewId=result.workout.id;run=null;releaseWakeLock();screen=result.sessionDone?(db.device.lastInterface==='child'?'child-final':'final'):'result';
+function afterFinished(result,personal,releasePointerId){lastResultId=result.attempt.id;viewId=result.workout.id;run=null;releaseWakeLock();screen=result.sessionDone?(db.device.lastInterface==='child'?'child-final':'final'):'result';
   if(result.workout.status==='completed'&&!M.currentChild(db))screen=db.device.lastInterface==='child'?'child-final':'final';
-  resultUntil=Date.now()+config.resultDisplaySec*1000;resetVoice();sayAttempt(result.attempt);
+  resultUntil=Date.now()+config.resultDisplaySec*1000;
+  resetVoice();
+  // A touch release can activate Safari speech; the measured time is already stored.
+  if(releasePointerId!==null&&sound())pendingAttemptVoice={pointerId:releasePointerId,attempt:result.attempt};
+  else sayAttempt(result.attempt);
   if(personal){const finishedScreen=screen;setTimeout(()=>{if(screen===finishedScreen)render();},200);}
   else render();}
 function startMeasurement(){
@@ -294,7 +298,7 @@ function startMeasurement(){
     render();
   }catch(e){fail(e);}
 }
-function completeMeasurement(now,personal=false){const dur=now-run.start;let intervals=[];let ms;if(run.mode==='intervals'){intervals=[...run.intervals];ms=intervals.reduce((x,y)=>x+y,0);}else ms=Math.max(1,Math.round(dur));const id=run.id;try{const v=operate(s=>M.finishAttempt(s,id,ms,intervals));afterFinished(v,personal);}catch(e){fail(e);}}
+function completeMeasurement(now,personal,releasePointerId){const dur=now-run.start;let intervals=[];let ms;if(run.mode==='intervals'){intervals=[...run.intervals];ms=intervals.reduce((x,y)=>x+y,0);}else ms=Math.max(1,Math.round(dur));const id=run.id;try{const v=operate(s=>M.finishAttempt(s,id,ms,intervals));afterFinished(v,personal,releasePointerId);}catch(e){fail(e);}}
 function flashPersonalTap(){
   const zone=app.querySelector('.personal-measure');
   if(!zone)return;
@@ -302,7 +306,7 @@ function flashPersonalTap(){
   zone.classList.add('flash');
   personalFlashTimer=setTimeout(()=>zone.classList.remove('flash'),200);
 }
-function tap(){
+function tap(releasePointerId=null){
   if(renderError||!config||!['athlete-ready','child-ready'].includes(screen))return;
   const personal=screen==='athlete-ready';
   const now=performance.now();
@@ -325,9 +329,9 @@ function tap(){
   const finished=run.mode==='stopwatch'||run.intervals.length===run.target;
   if(!finished||(personal&&run.mode==='intervals'))render();
   if(personal)flashPersonalTap();
-  if(finished)completeMeasurement(now,personal);
+  if(finished)completeMeasurement(now,personal,releasePointerId);
 }
-function resultProgress(){if(screen!=='result')return;const a=M.attemptOf(db,lastResultId);if(!a)return;const w=M.workoutOf(db,a.workoutId);if(Date.now()<resultUntil||voicePending>0)return;const c=M.currentChild(db);if(c?.athleteIds.length===2){screen='child-ready';queueVoice(athlete(M.nextTurn(db).athleteId).name);render();return;}
+function resultProgress(){if(screen!=='result')return;const a=M.attemptOf(db,lastResultId);if(!a)return;const w=M.workoutOf(db,a.workoutId);if(Date.now()<resultUntil||voicePending>0||pendingAttemptVoice)return;const c=M.currentChild(db);if(c?.athleteIds.length===2){screen='child-ready';queueVoice(athlete(M.nextTurn(db).athleteId).name);render();return;}
  if(w.status==='completed'){screen=db.device.lastInterface==='child'?'child-final':'final';render();return;}if(remainingRest(w)<=0){screen=isChild()?'child-ready':'athlete-ready';if(isChild())queueVoice('Можно начинать');render();}else{screen='rest';render();}}
 function tick(){
   if(renderError||!config)return;
@@ -466,7 +470,20 @@ async function importFile(file){if(!file)return;try{let raw=JSON.parse(await fil
    const base=M.blank();base.athletes=imported.athletes;const merged=M.merge(base,imported);merged.state.device={...db.device,selectedAthleteId:imported.athletes[0].id,trainerAthleteId:imported.athletes[0].id};M.validate(merged.state);localStorage.setItem(M.KEY,JSON.stringify(merged.state));db=merged.state;
   }else{const merged=M.merge(db,imported);localStorage.setItem(M.KEY,JSON.stringify(merged.state));db=merged.state;}
   message('Импорт завершён');render();}catch(e){fail(e);}}
-app.addEventListener('pointerdown',e=>{let area=e.target.closest('[data-tap]');if(!area||e.button!==0||e.isPrimary===false)return;e.preventDefault();tap(e);});
+app.addEventListener('pointerdown',e=>{
+  if(!e.target.closest('[data-tap]')||e.button!==0||e.isPrimary===false)return;
+  e.preventDefault();
+  tap(e.pointerType==='touch'||e.pointerType==='pen'?e.pointerId:null);
+});
+document.addEventListener('pointerup',e=>{
+  if(!pendingAttemptVoice||pendingAttemptVoice.pointerId!==e.pointerId)return;
+  const {attempt}=pendingAttemptVoice;
+  pendingAttemptVoice=null;
+  sayAttempt(attempt);
+},true);
+document.addEventListener('pointercancel',e=>{
+  if(pendingAttemptVoice?.pointerId===e.pointerId)pendingAttemptVoice=null;
+},true);
 app.addEventListener('keydown',e=>{
   const tab=e.target.closest('[role="tab"]');
   if(tab&&['ArrowLeft','ArrowRight','Home','End'].includes(e.key)){
@@ -476,7 +493,7 @@ app.addEventListener('keydown',e=>{
       (tabs.indexOf(tab)+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;
     tabs[index].focus();
   }
-if((e.key===' '||e.key==='Enter')&&e.target.closest('[data-tap]')&&!e.repeat){e.preventDefault();tap(e);}if(e.key==='Enter'&&e.target.id==='pin-input'){e.preventDefault();handleAction('pin-submit');}});
+if((e.key===' '||e.key==='Enter')&&e.target.closest('[data-tap]')&&!e.repeat){e.preventDefault();tap();}if(e.key==='Enter'&&e.target.id==='pin-input'){e.preventDefault();handleAction('pin-submit');}});
 app.addEventListener('click',e=>{const bt=e.target.closest('[data-act]');if(bt){if(bt.matches('a'))e.preventDefault();handleAction(bt.dataset.act,bt);}});
 app.addEventListener('change',e=>{
   const {id,value}=e.target;

@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.3<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.4<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -29,4 +29,38 @@ test('rest clock updates without replacing touch targets every tick',()=>{
   assert.match(app,/clock\.textContent=M\.mins\(remainingRest\(w\)\)/);
   assert.match(app,/case 'rest-early'/);
   assert.match(app,/restBypassedWorkout=w\?\.id/);
+});
+
+test('touch measures on press and voices the result once on release',async()=>{
+  const vm=require('node:vm');
+  const M=require('../model.js');
+  const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0};
+  const appEvents={},documentEvents={},spoken=[];
+  let state=JSON.stringify(M.blank()),now=1000;
+  const app={innerHTML:'',querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
+  const speechSynthesis={cancel(){},speak:utterance=>spoken.push(utterance.text)};
+  function SpeechSynthesisUtterance(text){this.text=text;}
+  vm.runInNewContext(get('app.js'),{
+    window:{ILModel:M,SideMigration:{run:()=>({})},addEventListener(){},speechSynthesis,SpeechSynthesisUtterance},
+    document:{getElementById:()=>app,addEventListener:(name,handler)=>{documentEvents[name]=handler;}},
+    localStorage:{getItem:()=>state,setItem:(_key,value)=>{state=value;}},
+    fetch:async()=>({ok:true,json:async()=>config}),
+    navigator:{},performance:{now:()=>now},console,speechSynthesis,SpeechSynthesisUtterance,
+    setInterval(){},setTimeout(){},clearTimeout(){},
+  });
+  await new Promise(resolve=>setImmediate(resolve));
+  appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act:'open-exercise'}})}});
+  const touch=pointerId=>({pointerId,pointerType:'touch',button:0,target:{closest:()=>true},preventDefault(){}});
+  appEvents.pointerdown(touch(1));
+  documentEvents.pointerup(touch(1));
+  now=2400;
+  appEvents.pointerdown(touch(2));
+  assert.equal(JSON.parse(state).attempts[0].totalMs,1400);
+  assert.deepEqual(spoken,[]);
+  documentEvents.pointerup(touch(3));
+  assert.deepEqual(spoken,[]);
+  now=3000;
+  documentEvents.pointerup(touch(2));
+  documentEvents.pointerup(touch(2));
+  assert.deepEqual(spoken,['1,4 секунды']);
 });
