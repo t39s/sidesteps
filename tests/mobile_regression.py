@@ -1,14 +1,12 @@
 """Additional portrait/mobile checks; uses in-memory Chromium, not live HTTPS/PWA."""
 from playwright.sync_api import sync_playwright
-from browser_smoke import make_page, tap, trainer
+from browser_smoke import make_page, new_exercise, tap, trainer
 
 
 def test_adult_long_press(browser):
     p,errors=make_page(browser,pin=False,viewport_width=320,mobile=True)
     p.set_viewport_size({'width':320,'height':720})
-    p.get_by_role('tab',name='Новое упражнение').click()
-    p.locator('#mode-select').select_option('stopwatch')
-    p.get_by_role('button',name='Начать тренировку').click()
+    new_exercise(p, mode='stopwatch')
     tap(p);tap(p)
     early=p.get_by_role('button',name='Начать раньше')
     early.wait_for(timeout=6000)
@@ -91,16 +89,11 @@ def test_history_chart_portrait(browser):
         q.set_viewport_size({'width':width,'height':740})
         history=q.get_by_role('tab',name='История')
         exercise=q.get_by_role('tab',name='Новое упражнение')
-        start=q.get_by_role('button',name='Начать тренировку')
         assert history.get_attribute('aria-selected')=='true'
-        assert not start.is_visible()
         history.press('ArrowRight')
-        assert exercise.get_attribute('aria-selected')=='true'
-        assert start.is_visible()
+        assert exercise.evaluate('(e)=>e===document.activeElement')
+        assert q.get_by_role('tabpanel',name='История').is_visible()
         assert q.locator('footer').count()==1
-        history.click()
-        assert history.get_attribute('aria-selected')=='true'
-        assert not start.is_visible()
         cards=q.get_by_role('tabpanel',name='История').locator(':scope > .panel')
         date=q.evaluate("window.ILModel.datetime('2027-01-13T00:00:00.000Z')")
         title=f'Тренировка {date}'
@@ -140,7 +133,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.6 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.7-rc.1 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
@@ -155,6 +148,9 @@ def test_history_chart_portrait(browser):
         assert history.get_attribute('aria-selected')=='true'
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         assert q.get_by_text('Две попытки по умолчанию.',exact=False).count()==0
+        exercise.press('Enter')
+        q.get_by_role('heading',name='Попытка 1 из 2').wait_for()
+        assert q.locator('.tap-surface').is_visible()
         assert not errors+errs,errors+errs
         q.close()
 
