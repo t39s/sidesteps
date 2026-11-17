@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.5<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.6<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -31,7 +31,7 @@ test('rest clock updates without replacing touch targets every tick',()=>{
   assert.match(app,/restBypassedWorkout=w\?\.id/);
 });
 
-test('last solo result is displayed and voiced in tenths before the training summary',async()=>{
+test('last solo result is displayed in milliseconds and voiced in tenths before the training summary',async()=>{
   const vm=require('node:vm');
   const M=require('../model.js');
   const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0};
@@ -70,7 +70,7 @@ test('last solo result is displayed and voiced in tenths before the training sum
   assert.deepEqual(spoken,['1,4 секунды']);
   showResult();
   assert.match(app.innerHTML,/Попытка 1<\/h1>/);
-  assert.match(app.innerHTML,/class="display">1,4 с/);
+  assert.match(app.innerHTML,/class="display">1,446 с/);
   clock+=config.resultDisplaySec*1000-1;
   tick();
   assert.match(app.innerHTML,/Попытка 1<\/h1>/);

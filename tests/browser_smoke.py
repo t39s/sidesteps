@@ -161,7 +161,7 @@ def test_rest_and_early_start(browser):
     page.get_by_text('Попытка 1',exact=True).wait_for()
     assert page.get_by_role('heading',name='Попытка 1',exact=True).is_visible()
     assert page.locator('.attempt-result .display').inner_text().split(',')[1].endswith(' с')
-    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==1
+    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==3
     result_button_width=page.get_by_role('button',name='Начать раньше').bounding_box()['width']
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
