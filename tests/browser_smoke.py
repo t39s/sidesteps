@@ -71,6 +71,14 @@ def test_adult(browser):
     page.close()
     page,reopened_errors=make_page(browser,data,pin=False)
     page.get_by_role('tab',name='Новая тренировка').click()
+    page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
+    assert page.locator('.play-glyph').is_visible()
+    page.get_by_role('button',name='Настройки',exact=True).click()
+    assert page.locator('#mode-select').input_value()=='intervals'
+    assert page.locator('#attempt-count').input_value()=='2'
+    page.locator('#attempt-count').select_option('1')
+    page.locator('#mode-select').select_option('stopwatch')
+    page.get_by_role('button',name='Назад',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
     tap(page);tap(page)

@@ -1,7 +1,8 @@
-sidesteps v0.2.8-rc.1
+sidesteps v0.2.8-rc.2
 Status: RELEASE CANDIDATE
 Base: v0.2.7 (1c64507235529a2434f35d4251e5de4381416306)
 Branch: develop
 Publishing: preview / through GitHub Actions.
 Test preset: 4 cutoffs. Restore 20 before stable release.
 Result pause: 5 seconds after speech finishes; resultPauseSec accepts 5 or 7.
+B-008: startup defaults and regression evidence in docs/B-008_STARTUP_DEFAULTS.md.

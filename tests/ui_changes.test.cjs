@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.8-rc\.1<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.8-rc\.2<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -58,6 +58,10 @@ for(const pause of [5,7])test(`solo result waits ${pause} seconds after speech a
   });
   await new Promise(resolve=>setImmediate(resolve));
   const click=act=>appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act}})}});
+  click('settings');
+  appEvents.change({target:{id:'attempt-count',value:'1'}});
+  click('settings-back');
+  appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act:'toggle-sound'},setAttribute(){}})}});
   click('open-exercise');
   const touch=pointerId=>({pointerId,pointerType:'touch',button:0,target:{closest:()=>true},preventDefault(){}});
   assert.match(app.innerHTML,/data-elapsed>0,0 с/);

@@ -10,7 +10,7 @@
   const mins = ms => { ms=Math.max(0,Math.ceil(ms/1000)); return String(Math.floor(ms/60)).padStart(2,'0')+':'+String(ms%60).padStart(2,'0'); };
   const date = s => new Date(s).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
   const datetime = s => new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  const blank = () => ({schemaVersion:5,revision:0,athletes:[{id:'athlete-default',name:'Спортсмен'}],workouts:[],attempts:[],childSessions:[],archived:[],incomplete:[],device:{lastInterface:'athlete',trainerActivated:false,soundEnabled:true,selectedAthleteId:'athlete-default',trainerAthleteId:'athlete-default',activeWorkoutId:null,activeChildSessionId:null,childParticipants:[],viewAthleteId:null,measurementMode:'intervals'}});
+  const blank = () => ({schemaVersion:5,revision:0,athletes:[{id:'athlete-default',name:'Спортсмен'}],workouts:[],attempts:[],childSessions:[],archived:[],incomplete:[],device:{lastInterface:'athlete',trainerActivated:false,soundEnabled:false,selectedAthleteId:'athlete-default',trainerAthleteId:'athlete-default',activeWorkoutId:null,activeChildSessionId:null,childParticipants:[],viewAthleteId:null,measurementMode:'intervals',soloPlannedAttempts:2,soloMeasurementMode:'intervals'}});
   const ensureUnique = (items,n) => { assert(Array.isArray(items),n+' не является массивом');const ids=items.map(x=>x.id);assert(ids.every(x=>typeof x==='string' && x.length>0) && new Set(ids).size===ids.length,'Повторяющиеся ID '+n); };
   function validate(s) {
     assert(s && s.schemaVersion===5,'Несовместимая версия данных');
