@@ -45,11 +45,11 @@ def new_exercise(page, attempts=None, mode=None):
         if mode is not None:
             page.locator('#mode-select').select_option(mode)
         page.get_by_role('button',name='Назад',exact=True).click()
-    page.get_by_role('tab',name='Новое упражнение').click()
+    page.get_by_role('tab',name='Новая тренировка').click()
 
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
+    page.get_by_role('tab',name='Новая тренировка').click()
     page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
     assert page.locator('.tap-surface').get_by_text('0 / 1 интервалов',exact=True).is_visible()
     state=page.evaluate('window.__dump()')
@@ -69,7 +69,7 @@ def test_adult(browser):
     data=page.evaluate('window.__dump()')
     page.close()
     page,reopened_errors=make_page(browser,data,pin=False)
-    page.get_by_role('tab',name='Новое упражнение').click()
+    page.get_by_role('tab',name='Новая тренировка').click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
     tap(page);tap(page)
@@ -227,7 +227,14 @@ def test_trainer_relocked_on_reload(browser):
 def test_intervals_20_taps(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':20,'minTapGapMs':0})
     new_exercise(page, attempts=1)
-    for _ in range(21):tap(page)
+    counter=page.locator('.personal-measure .counter')
+    assert counter.locator('.play-glyph').is_visible()
+    assert page.get_by_text('0 / 20 интервалов',exact=True).is_visible()
+    tap(page)
+    assert counter.inner_text()=='0'
+    tap(page)
+    assert counter.inner_text()=='1'
+    for _ in range(19):tap(page)
     page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert len(state['attempts'])==1
