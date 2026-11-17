@@ -144,3 +144,23 @@ test('invalid saved history is not overwritten by startup defaults', async () =>
   assert.equal(storage.get(M.KEY), invalid);
   assert.match(page.html(), /Не удалось открыть историю/);
 });
+
+test('only a workout with two completed attempts gets a best-attempt mark', async () => {
+  let state = M.addArchived(M.blank(), 'athlete-default', '2026-11-10', 1000).state;
+  function workout(durations) {
+    const started = M.startSolo(state, 'athlete-default', durations.length);
+    state = started.state;
+    for (const duration of durations) {
+      const attempt = M.startAttempt(state, started.value.id, 'stopwatch', config.intervalCount);
+      state = M.finishAttempt(attempt.state, attempt.value.id, duration, []).state;
+    }
+  }
+  workout([2000]);
+  const single = await openPage(storeState(state));
+  assert.doesNotMatch(single.html(), /Лучшая попытка/);
+  workout([3000, 2500]);
+  workout([500]);
+  const page = await openPage(storeState(state));
+  assert.equal((page.html().match(/aria-label="Лучшая попытка"/g) ?? []).length, 1);
+  assert.match(page.html(), /0,500 с <span aria-label="Личный рекорд">★/);
+});
