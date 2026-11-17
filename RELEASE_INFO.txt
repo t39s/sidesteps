@@ -1,5 +1,7 @@
-sidesteps v0.2.7-rc.8
-Status: RELEASE CANDIDATE
+sidesteps v0.2.7
+Release date: 2026-11-17
+Status: STABLE RELEASE
 Base: v0.2.6 (5304c95be9ac64a825f53fac00058c47219b2ccb)
-Branch: develop
-Publishing: preview / through GitHub Actions.
+Accepted candidate: v0.2.7-rc.8 (968334e9e702a4ccc80e3256c6b78e9c86702265)
+Branch: main
+Publishing: stable / through GitHub Actions.
