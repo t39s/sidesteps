@@ -101,7 +101,7 @@ def test_history_chart_portrait(browser):
         tabs=q.get_by_role('tablist').bounding_box()
         h=brand['height']
         assert abs(head['height']-h)<0.1
-        assert all(abs(gear[side]-h)<0.1 for side in ('width','height'))
+        assert all(abs(gear[side]-.85*h)<0.1 for side in ('width','height'))
         assert all(abs(button[side]-1.25*h)<0.1 for side in ('width','height'))
         assert abs(gear['x']+gear['width']/2-button['x']-button['width']/2)<0.1
         assert abs(gear['y']+gear['height']/2-button['y']-button['height']/2)<0.1

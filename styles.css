@@ -74,7 +74,7 @@
   color:var(--text);
 }
 .toolbar .settings-return{color:var(--nav-return-color)}
-.gear-glyph{display:block;width:var(--brand-height);height:var(--brand-height);pointer-events:none}
+.gear-glyph{display:block;width:calc(.85 * var(--brand-height));height:calc(.85 * var(--brand-height));pointer-events:none}
 :root{--nav-return-color:#78dc9b}
 button.nav-return{background:var(--nav-return-color);border-color:var(--nav-return-color);color:#152c20}
 .sound-on{color:#78dc9b}
