@@ -22,7 +22,7 @@
 .tap-surface.personal-measure{padding-inline:8px}
 .personal-measure .counter{font-size:clamp(204px,54vw,420px)}
 .counter-ready{display:grid;place-items:center;height:1em}
-.play-glyph{width:.5em;height:.58em;background:currentColor;clip-path:polygon(0 0,100% 50%,0 100%)}
+.play-glyph{width:.5em;height:.58em;background:currentColor;clip-path:polygon(0 0,100% 50%,0 100%);transform:translateX(10%)}
 .personal-measure:active:not(.flash){background:radial-gradient(circle at 50% 38%,#1a3f57,#0c1d30 70%);color:var(--text)}
 .personal-measure:active:not(.flash) .muted{color:var(--muted)}
 .personal-measure.flash{background:#ffd166;color:#071622}
