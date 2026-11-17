@@ -74,7 +74,7 @@ def test_adult(browser):
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
     tap(page);tap(page)
-    page.get_by_text('Тренировка завершена').wait_for(timeout=5000)
+    page.get_by_text('Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert not reopened_errors,reopened_errors
     assert len(state['workouts'])==1
@@ -161,7 +161,7 @@ def test_rest_and_early_start(browser):
     page.get_by_text('Попытка 1',exact=True).wait_for()
     assert page.get_by_role('heading',name='Попытка 1',exact=True).is_visible()
     assert page.locator('.attempt-result .display').inner_text().split(',')[1].endswith(' с')
-    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==2
+    assert len(page.locator('.attempt-result .display').inner_text().split(',')[1].split()[0])==1
     result_button_width=page.get_by_role('button',name='Начать раньше').bounding_box()['width']
     page.get_by_text('Отдых').wait_for()
     assert page.get_by_role('button',name='Начать раньше').count()==1
@@ -193,7 +193,7 @@ def test_timeout_and_resume(browser):
     restored,errs=make_page(browser,data,pin=False)
     # Restore during rest and advance wall-clock by >5 minutes, without starting attempt #2.
     restored.evaluate('Date.now = (()=>{let d=Date.now;return ()=>d()+310000;})()')
-    restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert state['workouts'][0]['status']=='completed'
     assert state['workouts'][0]['closeReason']=='timeout'
@@ -236,7 +236,7 @@ def test_intervals_20_taps(browser):
     tap(page)
     assert counter.inner_text()=='1'
     for _ in range(19):tap(page)
-    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
     assert len(state['attempts'])==1
     assert len(state['attempts'][0]['intervalsMs'])==20
@@ -253,7 +253,7 @@ def test_min_tap_gap_500ms(browser):
     assert page.get_by_text('Тренировка завершена').count()==0
     page.wait_for_timeout(480)
     tap(page)
-    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
+    page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors,errors
     page.close()
 

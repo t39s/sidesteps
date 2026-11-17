@@ -20,7 +20,7 @@ def test_adult_long_press(browser):
     assert p.locator('[data-rest-clock]').count()==0
     assert p.get_by_text('Можно начинать').count()==0
     tap(p);tap(p)
-    p.get_by_text('Тренировка завершена').wait_for(timeout=5000)
+    p.get_by_text('Тренировка завершена').wait_for(timeout=6500)
     assert not errors,errors
     p.close()
 
@@ -145,7 +145,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.7-rc.4 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.2.7-rc.5 · Войти'
         assert login.get_attribute('title')=='Для администратора'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

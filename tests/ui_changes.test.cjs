@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer contains the version and administrator link on one line',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.4<\/span>/);
+  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.2\.7-rc\.5<\/span>/);
   assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти<\/a>/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -31,14 +31,17 @@ test('rest clock updates without replacing touch targets every tick',()=>{
   assert.match(app,/restBypassedWorkout=w\?\.id/);
 });
 
-test('touch measures on press and voices the result once on release',async()=>{
+test('last solo result is displayed and voiced in tenths before the training summary',async()=>{
   const vm=require('node:vm');
   const M=require('../model.js');
   const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0};
   const appEvents={},documentEvents={},spoken=[];
-  let state=JSON.stringify(M.blank()),now=1000;
+  let initial=M.blank();
+  initial.device.soloPlannedAttempts=1;
+  let state=JSON.stringify(initial),now=1000,clock=Date.now(),tick,showResult;
+  class TestDate extends Date { static now(){return clock;} }
   const app={innerHTML:'',querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
-  const speechSynthesis={cancel(){},speak:utterance=>spoken.push(utterance.text)};
+  const speechSynthesis={cancel(){},speak:utterance=>{spoken.push(utterance.text);utterance.onend();}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   vm.runInNewContext(get('app.js'),{
     window:{ILModel:M,SideMigration:{run:()=>({})},addEventListener(){},speechSynthesis,SpeechSynthesisUtterance},
@@ -46,16 +49,18 @@ test('touch measures on press and voices the result once on release',async()=>{
     localStorage:{getItem:()=>state,setItem:(_key,value)=>{state=value;}},
     fetch:async()=>({ok:true,json:async()=>config}),
     navigator:{},performance:{now:()=>now},console,speechSynthesis,SpeechSynthesisUtterance,
-    setInterval(){},setTimeout(){},clearTimeout(){},
+    Date:TestDate,setInterval:fn=>{tick=fn;},setTimeout:(fn,ms)=>{if(ms===200)showResult=fn;},clearTimeout(){},
   });
   await new Promise(resolve=>setImmediate(resolve));
   appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act:'open-exercise'}})}});
   const touch=pointerId=>({pointerId,pointerType:'touch',button:0,target:{closest:()=>true},preventDefault(){}});
+  assert.match(app.innerHTML,/data-elapsed>0\.0 с/);
   appEvents.pointerdown(touch(1));
   documentEvents.pointerup(touch(1));
-  now=2400;
+  now=2446;
   appEvents.pointerdown(touch(2));
-  assert.equal(JSON.parse(state).attempts[0].totalMs,1400);
+  assert.equal(JSON.parse(state).attempts[0].totalMs,1446);
+  assert.equal(JSON.parse(state).workouts[0].status,'completed');
   assert.deepEqual(spoken,[]);
   documentEvents.pointerup(touch(3));
   assert.deepEqual(spoken,[]);
@@ -63,4 +68,14 @@ test('touch measures on press and voices the result once on release',async()=>{
   documentEvents.pointerup(touch(2));
   documentEvents.pointerup(touch(2));
   assert.deepEqual(spoken,['1,4 секунды']);
+  showResult();
+  assert.match(app.innerHTML,/Попытка 1<\/h1>/);
+  assert.match(app.innerHTML,/class="display">1,4 с/);
+  clock+=config.resultDisplaySec*1000-1;
+  tick();
+  assert.match(app.innerHTML,/Попытка 1<\/h1>/);
+  clock++;
+  tick();
+  assert.match(app.innerHTML,/Тренировка завершена<\/h1>/);
+  assert.match(app.innerHTML,/1,446 с/);
 });
