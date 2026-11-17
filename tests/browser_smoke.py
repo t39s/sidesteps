@@ -5,7 +5,7 @@ import json
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 PIN='246810'
-CONFIG={'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
+CONFIG={'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'recordDisplaySec':10,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
 
 def make_page(browser, data=None, pin=True, config_overrides=None, viewport_width=430, mobile=False):
     page=browser.new_page(viewport={'width':viewport_width,'height':900}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile)
@@ -115,6 +115,8 @@ def test_child_pair(browser):
     page.get_by_text('Маша',exact=True).first.wait_for(timeout=5000)
     page.get_by_text('Попытка 1 из 1').wait_for(timeout=5000)
     tap(page);tap(page)
+    page.get_by_text('Маша · Попытка 1').wait_for(timeout=5000)
+    page.evaluate('Date.now = (()=>{let original=Date.now;return ()=>original()+10000;})()')
     page.get_by_text('Результаты: Маша').wait_for(timeout=5000)
     assert page.locator('button[data-act="child-view"]').count()==2
     assert not errors,errors
