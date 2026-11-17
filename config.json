@@ -3,6 +3,7 @@
   "intervalCount": 20,
   "restDurationSec": 120,
   "resultDisplaySec": 10,
+  "resultPauseSec": 5,
   "audioPolicy": "user-controllable",
   "trainerAccess": {
     "algorithm": "PBKDF2-SHA256",
