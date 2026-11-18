@@ -1,4 +1,4 @@
-sidesteps v0.2.9-rc.6
+sidesteps v0.2.9-rc.7
 Release date: 2026-11-18
 Status: PREVIEW — awaiting owner acceptance
 Base: v0.2.8 (c1e6b806943a13bcfea14ecaf10c3ba4b85d55a6)
@@ -11,3 +11,4 @@ Sound enable is silent on every screen. Trainer exit link and athlete-style hist
 Participant name tabs on final and history screens use athlete tab styling and selected state. Final heading has no participant name. History login remains below app heading.
 Trainer background only: #401B2B; original cards, borders and controls retained. Final screen Login beneath application heading; increased Login separation in trainer interface.
 Trainer background updated to #321B27. All remaining trainer-session footer Login links moved below brand. Inactive settings icon grey; settings return and behavior retained.
+Trainer settings gear disabled. Start-stop uses pulsing play, large elapsed time, shared touch feedback and no service labels in both interfaces.

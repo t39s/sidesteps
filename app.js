@@ -12,6 +12,7 @@ const dateTime=x=>M.datetime(x);
 const athlete=id=>db.athletes.find(x=>x.id===id)||{name:'Неизвестный спортсмен'};
 const currentAthlete=()=>db.device.trainerActivated?db.device.trainerAthleteId:db.device.selectedAthleteId;
 const isChild=()=>db.device.lastInterface==='child';
+const trainerMode=()=>['child','trainer'].includes(db.device.lastInterface);
 const soundAvailable=()=>!renderError&&config?.audioPolicy==='user-controllable';
 const sound=()=>soundAvailable()&&db.device.soundEnabled;
 function speakerIcon(enabled){
@@ -89,7 +90,9 @@ function header(context='',actions='',homeLink=false,belowBrand=''){
       L4.49 8.24 L3.22 7.22 A10 10 0 0 1 5.38 4.50 L6.67 5.51 L7.77 6.05 A7.3 7.3 0 0 1 9.99 4.98 Z"/>
     <circle cx="12" cy="12" r="3"/>
   </svg>`;
-  const settingsButton=screen==='settings'
+  const settingsButton=trainerMode()
+    ?b(gear,'settings','header-icon settings-icon','aria-label="Настройки" disabled')
+    :screen==='settings'
     ?b(gear,'settings-back','header-icon settings-icon settings-return','aria-label="Назад из настроек"')
     :b(gear,'settings','header-icon settings-icon','aria-label="Настройки"');
   const controls=`<div class="toolbar header-controls"><span class="header-icon-slot">${soundControl()}</span><span class="header-icon-slot">${settingsButton}</span></div>`;
@@ -130,12 +133,16 @@ function soloReady(){
     card(`<h1 class="hero-title center">Попытка ${attempt} из ${count}</h1>`)+
     measureSurface(true,mode);
 }
-function measureSurface(personal=false,mode=db.device.measurementMode){const running=!!run;const intervals=running?run.intervals.length:0;
-  const showPlay=personal&&mode==='intervals'&&!running;
-  const counter=showPlay
-    ?'<div class="counter counter-ready" aria-hidden="true"><span class="play-glyph"></span></div>'
-    :`<div class="counter" data-digits="${String(intervals).length}">${intervals}</div>`;
-  const sec=elapsedSeconds(running?performance.now()-run.start:0,true);return `<div class="tap-surface${personal?' personal-measure':''}" data-tap="1" role="button" tabindex="0" aria-label="${running?'Отсечка или стоп':'Начать измерение'}">${personal&&mode==='intervals'?'':`<div class="muted">${mode==='intervals'?'С ОТСЕЧКАМИ':'СТАРТ–СТОП'}</div>`}${mode==='intervals'?`${counter}<div class="${personal?'secondary-display':'note'}">${intervals} / ${run?run.target:config.intervalCount} интервалов</div>`:'<div style="height:26px"></div>'}<div class="secondary-display" data-elapsed>${sec} с</div>${personal&&mode==='intervals'?'':`<div class="muted" style="margin-top:20px">${running?(mode==='intervals'?'КОСНИСЬ ДЛЯ ОТСЕЧКИ':'КОСНИСЬ ДЛЯ СТОПА'):'КОСНИСЬ ДЛЯ СТАРТА'}</div>`}</div>`;}
+function measureSurface(personal=false,mode=db.device.measurementMode){
+  const running=!!run,intervals=running?run.intervals.length:0;
+  const sec=elapsedSeconds(running?performance.now()-run.start:0,true);
+  const play='<div class="counter counter-ready" aria-hidden="true"><span class="play-glyph"></span></div>';
+  const counter=!running?play:mode==='intervals'
+    ?`<div class="counter" data-digits="${String(intervals).length}">${intervals}</div>`
+    :`<div class="stopwatch-counter" data-elapsed>${sec} с</div>`;
+  return `<div class="tap-surface personal-measure" data-tap="1" role="button" tabindex="0" aria-label="${running?(mode==='intervals'?'Отсечка или стоп':'Остановить измерение'):'Начать измерение'}">${counter}${mode==='intervals'?`<div class="secondary-display">${intervals} / ${run?run.target:config.intervalCount} интервалов</div>`:''}${mode==='intervals'||!running?`<div class="secondary-display" data-elapsed>${sec} с</div>`:''}</div>`;
+}
+
 function childReady(){const c=M.currentChild(db);if(!c)return childFinal();const turn=M.nextTurn(db);if(!turn)return childFinal();const w=M.workoutOf(db,turn.workoutId);if(c.athleteIds.length===1&&turn.ordinal===2&&w?.firstEndedAt&&config){const restLeft=remainingRest(w);if(restLeft>0&&restBypassedWorkout!==w.id)return restScreen(true,w);}
   return header()+card(`<h1 class="hero-title center">Попытка ${turn.ordinal} из ${c.plannedAttempts}</h1><div class="center muted participant-name">${esc(athlete(turn.athleteId).name)}</div>`)+measureSurface(true);
 }
@@ -296,7 +303,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
   return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(a=>`<div class="list-row"><span>${esc(a.name)}</span>${b('История','trainer-history','small',`data-id="${esc(a.id)}"`)} ${db.athletes.length>1?b('Удалить','delete-athlete','danger small',`data-id="${esc(a.id)}"`):''}</div>`).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div><label>Мой профиль спортсмена<select id="coach-athlete">${db.athletes.map(a=>`<option value="${esc(a.id)}" ${a.id===db.device.trainerAthleteId?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>`)+card(`<h2>Добавить архивный результат</h2><p class="note">Историческое время без отдельных попыток. Не редактирует уже измеренные значения.</p><label>Спортсмен<select id="archive-athlete">${options}</select></label><label>Дата<input type="date" id="archive-date"></label><label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label><div class="buttons">${b('Добавить в архив','add-archive','primary')}</div>`)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function pinScreen(){return header()+card(`<h2>Вход администратора</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного администратором, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.9-rc.6</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
+function render(){if(!db)return;document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v. 0.2.9-rc.7</span>${showAdminLogin?' <span aria-hidden="true">·</span> <a href="#admin-login" data-act="pin" title="Для администратора">Войти</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -417,6 +424,7 @@ function tick(){
 async function handleAction(name,button){try{
  switch(name){
  case 'settings':{
+   if(trainerMode())return;
    settingsFrom=screen;
    settingsDraft=['pin','trainer'].includes(screen)
      ? Array.from(app.querySelectorAll('input[id]:not([type="file"]),select[id]'),field=>[field.id,field.value])

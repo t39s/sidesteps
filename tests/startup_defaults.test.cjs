@@ -91,7 +91,7 @@ test('starting another exercise in the same page keeps user choices', async () =
   page.click('final-home');
   page.click('open-exercise');
   assert.match(page.html(), /Попытка 1 из 1/);
-  assert.match(page.html(), /КОСНИСЬ ДЛЯ СТАРТА/);
+  assert.match(page.html(), /play-glyph/);
   assert.equal(page.state().device.soundEnabled, true);
   page.tap();
   assert.equal(page.state().attempts[1].mode, 'stopwatch');

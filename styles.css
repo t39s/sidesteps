@@ -99,3 +99,6 @@ body.trainer-theme{background:#321B27}
 .trainer-theme .header-login{margin-top:.5em}
 
 .trainer-theme .settings-icon:not(.settings-return){color:#929292}
+
+.stopwatch-counter{display:flex;align-items:center;justify-content:center;min-height:clamp(204px,54vw,420px);font-size:clamp(64px,18vw,136px);font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap}
+.trainer-theme .settings-icon:disabled{color:#929292;opacity:1}

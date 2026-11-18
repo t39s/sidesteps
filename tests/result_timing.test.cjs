@@ -2,17 +2,17 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
-  let clock=Date.now(),delayedResult,api,cancels=0,resumes=0;
+  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0;
   const spoken=[],utterances=[],bodyClasses=new Set();
   class TestDate extends Date {static now(){return clock;}}
   const app={innerHTML:'',querySelector:()=>null,addEventListener(){}};
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
-    speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>1000},
+    speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
     localStorage:{setItem(){}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
@@ -193,4 +193,22 @@ test('trainer session login stays beneath brand on every screen, never in footer
     assert.match(html,/<header[\s\S]*header-login">Войти<\/a>[\s\S]*<\/header>/,screen);
     assert.doesNotMatch(html,/<footer[\s\S]*data-act="pin"/,screen);
   }
+});
+
+test('trainer settings are disabled in markup and action handler; athlete settings remain available',async()=>{
+  for(const mode of ['trainer','child','athlete']){
+    const s=M.blank();s.device.lastInterface=mode;const f=fixture(s);f.api.setScreen(mode==='trainer'?'trainer':mode==='child'?'child-ready':'athlete');
+    if(mode==='trainer')f.api.unlock();f.api.render();
+    if(mode!=='athlete')assert.match(f.app.innerHTML,/aria-label="Настройки" disabled/);
+    await f.api.handleAction('settings',{});
+    assert.equal(f.api.screen()==='settings',mode==='athlete');
+  }
+});
+test('start-stop shares play surface and shows large elapsed time with two-touch measurement',async()=>{
+  const s=M.blank();s.device.soloMeasurementMode='stopwatch';s.device.soloPlannedAttempts=1;
+  const f=fixture(s);f.api.setScreen('athlete-ready');f.api.render();
+  assert.match(f.app.innerHTML,/counter-ready/);assert.doesNotMatch(f.app.innerHTML,/КОСНИСЬ|СТАРТ–СТОП|интервалов/);
+  f.api.tap();f.advance(1500);f.api.render();
+  assert.match(f.app.innerHTML,/class="stopwatch-counter" data-elapsed>1,5 с/);
+  f.api.tap();f.show();assert.match(f.app.innerHTML,/1,500 с/);
 });
