@@ -148,3 +148,28 @@ test('trainer exit is a link and returns to athlete history',async()=>{
   assert.doesNotMatch(html,/Мои упражнения/);
   await f.api.handleAction('switch-athlete',{});assert.equal(f.api.screen(),'athlete');
 });
+
+test('participant tabs select the same athlete on final and history screens',async()=>{
+  let s=M.blank();const added=M.addAthlete(s,'Второй');s=added.state;
+  s=M.startChild(s,['athlete-default',added.value.id],1).state;
+  for(let i=0;i<2;i++){
+    const a=M.startAttempt(s,M.nextTurn(s).workoutId,'stopwatch',4);s=a.state;
+    s=M.finishAttempt(s,a.value.id,1500+i*100,[]).state;
+  }
+  const f=fixture(s);
+  const selected=id=>new RegExp(`id="profile-tab-${id}"[^>]*aria-selected="true"`);
+  let html=f.api.childFinal();
+  assert.match(html,/<h1 class="hero-title center">Тренировка завершена<\/h1><\/section>/);
+  assert.match(html,/class="athlete-tabs participant-tabs" role="tablist"/);
+  assert.match(html,selected(added.value.id));
+  await f.api.handleAction('child-view',{dataset:{id:'athlete-default'}});
+  assert.match(f.app.innerHTML,selected('athlete-default'));
+  await f.api.handleAction('history-child',{});
+  assert.match(f.app.innerHTML,selected('athlete-default'));
+  assert.match(f.app.innerHTML,/header-login">Войти/);
+  await f.api.handleAction('history-profile',{dataset:{id:added.value.id}});
+  assert.match(f.app.innerHTML,selected(added.value.id));
+  assert.match(f.app.innerHTML,/1,600/);
+  await f.api.handleAction('history-profile',{dataset:{id:'unrelated'}});
+  assert.match(f.app.innerHTML,selected(added.value.id));
+});
