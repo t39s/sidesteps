@@ -3,7 +3,7 @@ const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
   let clock=Date.now(),delayedResult,api,cancels=0,resumes=0;
-  const spoken=[],utterances=[];
+  const spoken=[],utterances=[],bodyClasses=new Set();
   class TestDate extends Date {static now(){return clock;}}
   const app={innerHTML:'',querySelector:()=>null,addEventListener(){}};
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
@@ -11,12 +11,12 @@ function fixture(state,soundEnabled=false){
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
   const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
-    window,document:{getElementById:()=>app,addEventListener(){}},navigator:{},console,
+    window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>1000},
     localStorage:{setItem(){}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
-  return {api,app,spoken,utterances,speechSynthesis,advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
+  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
@@ -172,4 +172,14 @@ test('participant tabs select the same athlete on final and history screens',asy
   assert.match(f.app.innerHTML,/1,600/);
   await f.api.handleAction('history-profile',{dataset:{id:'unrelated'}});
   assert.match(f.app.innerHTML,selected(added.value.id));
+});
+
+test('trainer background scope and final login under brand',async()=>{
+  const {state}=finish({child:true});const f=fixture(state);
+  f.api.setScreen('child-final');f.api.render();
+  assert.ok(f.bodyClasses.has('trainer-theme'));
+  assert.equal((f.app.innerHTML.match(/data-act="pin"/g)||[]).length,1);
+  assert.match(f.app.innerHTML,/<header[\s\S]*header-login">Войти<\/a>[\s\S]*<\/header>/);
+  await f.api.handleAction('switch-athlete',{});
+  assert.ok(!f.bodyClasses.has('trainer-theme'));
 });
