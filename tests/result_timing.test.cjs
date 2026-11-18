@@ -9,7 +9,7 @@ function fixture(state,soundEnabled=false){
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>1000},
@@ -117,4 +117,34 @@ test('trainer final summary preserves participant selector and workout details',
   assert.equal((html.match(/data-act="child-view"/g)||[]).length,2);
   assert.match(html,/Мой прогресс/);assert.match(html,/1,600/);
   assert.match(html,/data-act="history-child"/);
+});
+
+test('enabling sound on any screen is silent, subsequent events still speak',async()=>{
+  for(const screen of ['athlete','trainer','history','settings','pin','athlete-ready','child-ready','result','final','child-final']){
+    const {state,result}=finish({child:screen==='child-final'});const f=fixture(state);
+    f.api.afterFinished(result, false, null);f.api.setScreen(screen);
+    await f.api.handleAction('toggle-sound',{setAttribute(){}});
+    assert.deepEqual(f.spoken,[],screen);
+    f.api.sayAttempt(result.attempt);assert.equal(f.spoken[0],'1,4 секунды');
+    await f.api.handleAction('toggle-sound',{setAttribute(){}});
+    assert.ok(f.cancels()>0);
+  }
+});
+test('trainer history has one login below brand and athlete history panels',()=>{
+  for(const mode of ['child','trainer']){
+    const {state}=finish({child:true});state.device.lastInterface=mode;
+    const f=fixture(state);f.api.setScreen('history');if(mode==='trainer')f.api.unlock();
+    f.api.render();const html=f.app.innerHTML;
+    assert.equal((html.match(/data-act="pin"/g)||[]).length,1);
+    assert.match(html,/<header[\s\S]*class="mode-tag header-login">Войти<\/a>[\s\S]*<\/header>/);
+    assert.doesNotMatch(html,/data-act="back-history"|mode-tag">История/);
+    assert.match(html,/Мой прогресс/);assert.match(html,/history-chart/);
+    assert.match(html,/Спортсмен/);
+  }
+});
+test('trainer exit is a link and returns to athlete history',async()=>{
+  const s=M.blank();s.device.lastInterface='trainer';const f=fixture(s);f.api.unlock();
+  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Выйти<\/a>/);
+  assert.doesNotMatch(html,/Мои упражнения/);
+  await f.api.handleAction('switch-athlete',{});assert.equal(f.api.screen(),'athlete');
 });

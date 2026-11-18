@@ -88,3 +88,6 @@
 .gear-glyph,.speaker-glyph{display:block;width:calc(.85 * var(--brand-height));height:calc(.85 * var(--brand-height));pointer-events:none}
 :root{--nav-return-color:#78dc9b}
 button.nav-return{background:var(--nav-return-color);border-color:var(--nav-return-color);color:#152c20}
+
+.header-login{display:block;width:fit-content;text-decoration:underline}
+.header-actions .trainer-exit{margin-right:auto;text-align:left;text-decoration:underline}

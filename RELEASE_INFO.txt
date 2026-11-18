@@ -1,5 +1,5 @@
-sidesteps v0.2.9-rc.2
-Release date: 2026-11-17
+sidesteps v0.2.9-rc.3
+Release date: 2026-11-18
 Status: PREVIEW — awaiting owner acceptance
 Base: v0.2.8 (c1e6b806943a13bcfea14ecaf10c3ba4b85d55a6)
 Branch: develop
@@ -7,3 +7,4 @@ Training preset: 4 intervals; rest 15 seconds.
 Result display from first appearance: ordinary 5 seconds; personal record 10 seconds. Speech runs in parallel.
 Athlete rest announcement: once with 10 seconds remaining, without cancelling the speech engine.
 Training session screens share athlete layout, play icon, pulse, tap feedback, result/rest panels and final summary. Participant names and turn order retained.
+Sound enable is silent on every screen. Trainer exit link and athlete-style history with login under brand; no history back button or history label.
