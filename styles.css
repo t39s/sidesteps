@@ -95,5 +95,7 @@ button.nav-return{background:var(--nav-return-color);border-color:var(--nav-retu
 .participant-tabs{grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr))}
 .participant-tabs button{overflow-wrap:anywhere}
 
-body.trainer-theme{background:#401B2B}
+body.trainer-theme{background:#321B27}
 .trainer-theme .header-login{margin-top:.5em}
+
+.trainer-theme .settings-icon:not(.settings-return){color:#929292}

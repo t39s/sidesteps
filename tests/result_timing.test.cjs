@@ -183,3 +183,14 @@ test('trainer background scope and final login under brand',async()=>{
   await f.api.handleAction('switch-athlete',{});
   assert.ok(!f.bodyClasses.has('trainer-theme'));
 });
+
+test('trainer session login stays beneath brand on every screen, never in footer',()=>{
+  const {state,result}=finish({child:true,planned:2});const f=fixture(state);
+  f.api.afterFinished(result,false,null);
+  for(const screen of ['child-ready','result','rest','child-final','history','settings']){
+    f.api.setScreen(screen);f.api.render();const html=f.app.innerHTML;
+    assert.equal((html.match(/data-act="pin"/g)||[]).length,1,screen);
+    assert.match(html,/<header[\s\S]*header-login">Войти<\/a>[\s\S]*<\/header>/,screen);
+    assert.doesNotMatch(html,/<footer[\s\S]*data-act="pin"/,screen);
+  }
+});
