@@ -212,3 +212,13 @@ test('start-stop shares play surface and shows large elapsed time with two-touch
   assert.match(f.app.innerHTML,/class="stopwatch-counter" data-elapsed>1,5 с/);
   f.api.tap();f.show();assert.match(f.app.innerHTML,/1,500 с/);
 });
+
+test('athlete administrator login gear is disabled and settings work again after returning',async()=>{
+  const f=fixture(M.blank());f.api.setScreen('athlete');
+  await f.api.handleAction('pin',{});f.api.render();
+  assert.match(f.app.innerHTML,/aria-label="Настройки" disabled/);
+  await f.api.handleAction('settings',{});assert.equal(f.api.screen(),'pin');
+  await f.api.handleAction('pin-back',{});assert.equal(f.api.screen(),'athlete');
+  assert.doesNotMatch(f.app.innerHTML,/aria-label="Настройки" disabled/);
+  await f.api.handleAction('settings',{});assert.equal(f.api.screen(),'settings');
+});
