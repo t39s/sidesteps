@@ -1,10 +1,9 @@
-sidesteps v0.2.8
-Release date: 2026-11-17
+sidesteps v0.2.9
+Release date: 2026-11-18
 Status: STABLE RELEASE
-Base: v0.2.7 (1c64507235529a2434f35d4251e5de4381416306)
-Accepted candidate: v0.2.8-rc.4 (ee9d71f384ff2fd2d8d5065494578294c18d1cd0)
+Base: v0.2.8 (c1e6b806943a13bcfea14ecaf10c3ba4b85d55a6)
+Accepted candidate: v0.2.9-rc.8 (099dd5eb2e1142e19dad266ccda8f37c00ca257d)
 Branch: main
-Publishing: stable / through GitHub Actions.
-Training preset: 20 cutoffs.
-Result pause: 5 seconds after speech finishes; resultPauseSec accepts 5 or 7.
-B-008: docs/B-008_STARTUP_DEFAULTS.md.
+Training preset: 20 intervals; rest 120 seconds.
+Result display from appearance: ordinary 5 seconds; record 10 seconds, independent of speech.
+Publishing: develop to main PR, GitHub Actions Pages and immutable v0.2.9 tag.

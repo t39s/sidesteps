@@ -88,3 +88,17 @@
 .gear-glyph,.speaker-glyph{display:block;width:calc(.85 * var(--brand-height));height:calc(.85 * var(--brand-height));pointer-events:none}
 :root{--nav-return-color:#78dc9b}
 button.nav-return{background:var(--nav-return-color);border-color:var(--nav-return-color);color:#152c20}
+
+.header-login{display:block;width:fit-content;text-decoration:underline}
+.header-actions .trainer-exit{margin-right:auto;text-align:left;text-decoration:underline}
+
+.participant-tabs{grid-template-columns:repeat(auto-fit,minmax(min(100%,130px),1fr))}
+.participant-tabs button{overflow-wrap:anywhere}
+
+body.trainer-theme{background:#321B27}
+.trainer-theme .header-login{margin-top:.5em}
+
+.trainer-theme .settings-icon:not(.settings-return){color:#929292}
+
+.stopwatch-counter{display:flex;align-items:center;justify-content:center;min-height:clamp(204px,54vw,420px);font-size:clamp(64px,18vw,136px);font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap}
+.toolbar .settings-icon:disabled{color:#929292;opacity:1}
