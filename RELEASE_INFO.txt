@@ -1,9 +1,7 @@
-sidesteps v0.2.9
+sidesteps v0.2.10-rc.1
 Release date: 2026-11-18
-Status: STABLE RELEASE
-Base: v0.2.8 (c1e6b806943a13bcfea14ecaf10c3ba4b85d55a6)
-Accepted candidate: v0.2.9-rc.8 (099dd5eb2e1142e19dad266ccda8f37c00ca257d)
-Branch: main
-Training preset: 20 intervals; rest 120 seconds.
-Result display from appearance: ordinary 5 seconds; record 10 seconds, independent of speech.
-Publishing: develop to main PR, GitHub Actions Pages and immutable v0.2.9 tag.
+Status: PREVIEW — awaiting owner acceptance
+Base: v0.2.9 (315a2f7ac26fe8a20e1d42e07e65942edb1d2e1a)
+Branch: develop
+Change: administrator PIN verifier rotated; plaintext PIN is not stored.
+Training preset unchanged: 20 intervals, rest 120 seconds.

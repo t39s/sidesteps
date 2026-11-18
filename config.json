@@ -7,8 +7,8 @@
   "trainerAccess": {
     "algorithm": "PBKDF2-SHA256",
     "iterations": 200000,
-    "saltB64": "hRChAcIpAkCNpKBs43h+5w==",
-    "verifierB64": "DqNqS54A49ULG5BlYgFM0+I7HniQg4bcWjq/5uQtpJI="
+    "saltB64": "KYLQMr58mWTyd1y9OahYyA==",
+    "verifierB64": "mV9/SEu5XdhFJhrthr69osGKn+v0k0jqpd5qBjN5kPo="
   },
   "recordDisplaySec": 10
 }
