@@ -9,7 +9,7 @@ function fixture(state,soundEnabled=false){
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify(config)};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
@@ -87,7 +87,7 @@ test('record announcement follows the time',()=>{
 test('display config requires both perception durations',()=>{
   const f=fixture(M.blank());assert.ok(f.api.validateConfig(config));
   for(const key of ['resultDisplaySec','recordDisplaySec'])assert.throws(()=>f.api.validateConfig({...config,[key]:0}));
-  assert.equal(config.intervalCount,4);assert.equal(config.restDurationSec,15);assert.ok(!('resultPauseSec'in config));
+  assert.equal(config.intervalCount,20);assert.equal(config.restDurationSec,120);assert.ok(!('resultPauseSec'in config));
 });
 
 test('trainer uses athlete measurement layout with participant identity',()=>{

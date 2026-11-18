@@ -1,15 +1,9 @@
-sidesteps v0.2.9-rc.8
+sidesteps v0.2.9
 Release date: 2026-11-18
-Status: PREVIEW — awaiting owner acceptance
+Status: STABLE RELEASE
 Base: v0.2.8 (c1e6b806943a13bcfea14ecaf10c3ba4b85d55a6)
-Branch: develop
-Training preset: 4 intervals; rest 15 seconds.
-Result display from first appearance: ordinary 5 seconds; personal record 10 seconds. Speech runs in parallel.
-Athlete rest announcement: once with 10 seconds remaining, without cancelling the speech engine.
-Training session screens share athlete layout, play icon, pulse, tap feedback, result/rest panels and final summary. Participant names and turn order retained.
-Sound enable is silent on every screen. Trainer exit link and athlete-style history with login under brand; no history back button or history label.
-Participant name tabs on final and history screens use athlete tab styling and selected state. Final heading has no participant name. History login remains below app heading.
-Trainer background only: #401B2B; original cards, borders and controls retained. Final screen Login beneath application heading; increased Login separation in trainer interface.
-Trainer background updated to #321B27. All remaining trainer-session footer Login links moved below brand. Inactive settings icon grey; settings return and behavior retained.
-Trainer settings gear disabled. Start-stop uses pulsing play, large elapsed time, shared touch feedback and no service labels in both interfaces.
-Administrator login from athlete mode: gear remains visible, grey and disabled. Athlete settings on other screens remain available.
+Accepted candidate: v0.2.9-rc.8 (099dd5eb2e1142e19dad266ccda8f37c00ca257d)
+Branch: main
+Training preset: 20 intervals; rest 120 seconds.
+Result display from appearance: ordinary 5 seconds; record 10 seconds, independent of speech.
+Publishing: develop to main PR, GitHub Actions Pages and immutable v0.2.9 tag.
