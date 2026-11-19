@@ -5,3 +5,4 @@ Base: v0.2.10 (efbea396a777da132256f1cd538fabaf4b8140cc)
 Branch: develop
 Fix: result deadline initializes on first display, including return from settings or administrator login during delayed rendering.
 Result perception: ordinary 5 seconds, record 10 seconds; sound independent.
+Preview test preset: 4 intervals; rest 20 seconds.

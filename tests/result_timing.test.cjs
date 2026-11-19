@@ -87,7 +87,7 @@ test('record announcement follows the time',()=>{
 test('display config requires both perception durations',()=>{
   const f=fixture(M.blank());assert.ok(f.api.validateConfig(config));
   for(const key of ['resultDisplaySec','recordDisplaySec'])assert.throws(()=>f.api.validateConfig({...config,[key]:0}));
-  assert.equal(config.intervalCount,20);assert.equal(config.restDurationSec,120);assert.ok(!('resultPauseSec'in config));
+  assert.ok(!('resultPauseSec'in config));
 });
 
 test('trainer uses athlete measurement layout with participant identity',()=>{

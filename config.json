@@ -1,7 +1,7 @@
 {
   "minTapGapMs": 500,
-  "intervalCount": 20,
-  "restDurationSec": 120,
+  "intervalCount": 4,
+  "restDurationSec": 20,
   "resultDisplaySec": 5,
   "audioPolicy": "user-controllable",
   "trainerAccess": {
