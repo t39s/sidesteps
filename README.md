@@ -1,4 +1,4 @@
-# sidesteps v0.2.11-rc.6 — preview
+# sidesteps v0.2.11-rc.7 — preview
 
 **Статус: кандидат в `develop`, ожидает приёмки владельцем.** Изменения и проверки: `RELEASE_REPORT.md`; ограничения: `KNOWN_ISSUES.md`.
 

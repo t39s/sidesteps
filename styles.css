@@ -124,7 +124,7 @@ body.trainer-theme{background:#321B27}
 .animation-sample .counter-ready{width:1em;height:1em}
 
 .athlete-row + .athlete-row{border-top:1px solid var(--line)}
-.athlete-row-controls{flex-wrap:wrap}
+.athlete-row-controls{display:grid;grid-template-columns:minmax(0,1fr)}
 .athlete-row-controls > span{overflow-wrap:anywhere}
 .athlete-row-actions{display:flex;flex-wrap:wrap;gap:.4rem}
 .athlete-rename{padding-bottom:.75rem}
