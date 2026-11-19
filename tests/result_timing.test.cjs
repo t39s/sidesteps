@@ -2,6 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
+  let stored=null;
   let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0,storageFailure=false,confirmResult=true,confirmWait=0;
   const spoken=[],utterances=[],bodyClasses=new Set();
   class TestDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
@@ -15,7 +16,7 @@ function fixture(state,soundEnabled=false){
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
-    localStorage:{setItem(){if(storageFailure)throw Error('Storage unavailable');}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
+    localStorage:{getItem(){return stored;},setItem(key,value){if(storageFailure)throw Error('Storage unavailable');stored=value;}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
   return {api,app,submit(form){handlers.submit({target:form,preventDefault(){}});},spoken,utterances,speechSynthesis,bodyClasses,confirmations,setConfirm(result,wait=0){confirmResult=result;confirmWait=wait;},chooseAnimation(value){handlers.change({target:{name:'launch-animation',value}});},failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};

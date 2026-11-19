@@ -2,6 +2,7 @@
 This validates UI flow, but NOT HTTP/PWA/offline/WebCrypto native behavior."""
 from pathlib import Path
 import json
+import os
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 PIN='246810'
@@ -44,7 +45,7 @@ def new_exercise(page, attempts=None, mode=None):
             page.locator('#attempt-count').select_option(str(attempts))
         if mode is not None:
             page.locator('#mode-select').select_option(mode)
-        page.get_by_role('button',name='Назад',exact=True).click()
+        page.get_by_role('button',name='Назад из настроек',exact=True).click()
     page.get_by_role('tab',name='Новая тренировка').click()
 
 def test_adult(browser):
@@ -53,19 +54,19 @@ def test_adult(browser):
     page.get_by_role('heading',name='Попытка 1 из 2').wait_for()
     assert page.locator('.tap-surface').get_by_text('0 / 1 интервалов',exact=True).is_visible()
     state=page.evaluate('window.__dump()')
-    assert not json.loads(state['interval-lab:data:v5'])['workouts']
+    assert not json.loads(state['interval-lab:data:v6'])['workouts']
 
     page.get_by_role('button',name='Настройки',exact=True).click()
-    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка']
+    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка','Анимация запуска']
     assert page.get_by_role('button',name='Звук',exact=True).is_visible()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'
     assert mode.locator('option:checked').inner_text()=='1 отсечка (по умолчанию)'
     page.locator('#attempt-count').select_option('1')
     mode.select_option('stopwatch')
-    page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('button',name='Назад из настроек',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
-    assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
+    assert page.locator('.play-glyph').is_visible()
 
     data=page.evaluate('window.__dump()')
     page.close()
@@ -78,12 +79,12 @@ def test_adult(browser):
     assert page.locator('#attempt-count').input_value()=='2'
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('button',name='Назад из настроек',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
-    assert page.get_by_text('КОСНИСЬ ДЛЯ СТАРТА').is_visible()
+    assert page.locator('.play-glyph').is_visible()
     tap(page);tap(page)
     page.get_by_text('Тренировка завершена').wait_for(timeout=6500)
-    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert not reopened_errors,reopened_errors
     assert len(state['workouts'])==1
     assert state['attempts'][0]['mode']=='stopwatch'
@@ -118,9 +119,9 @@ def test_child_pair(browser):
     page.locator('.attempt-result').wait_for(timeout=5000)
     page.evaluate('Date.now = (()=>{let original=Date.now;return ()=>original()+10000;})()')
     page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
-    assert page.locator('button[data-act="child-view"]').count()==2
+    assert page.locator('[data-act="child-view"]').count()==2
     assert not errors,errors
-    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert len([w for w in state['workouts'] if w['status']=='completed'])==2
     page.screenshot(path=str(ROOT/'tests'/'child_screenshot.png'))
     page.close()
@@ -152,7 +153,7 @@ def test_pin_no_config(browser):
     page.get_by_role('link',name='Войти',exact=True).click()
     page.get_by_text('PIN пока не сконфигурирован',exact=False).wait_for(timeout=5000)
     assert 'pin-input' not in page.locator('body').inner_html()
-    assert page.get_by_text('Доступ администратора',exact=True).count()==0
+    assert page.get_by_text('Доступ Тренера',exact=True).count()==0
     card=page.locator('main > .panel')
     back=page.get_by_role('button',name='Назад',exact=True)
     assert card.get_by_role('button',name='Назад').count()==0
@@ -204,7 +205,7 @@ def test_timeout_and_resume(browser):
     # Restore during rest and advance wall-clock by >5 minutes, without starting attempt #2.
     restored.evaluate('Date.now = (()=>{let d=Date.now;return ()=>d()+310000;})()')
     restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
-    state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert state['workouts'][0]['status']=='completed'
     assert state['workouts'][0]['closeReason']=='timeout'
     assert len([a for a in state['attempts'] if a['status']=='completed'])==1
@@ -217,7 +218,7 @@ def test_restart_mid_attempt(browser):
     tap(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data,pin=False)
-    state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    state=json.loads(restored.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert state['attempts'][0]['status']=='interrupted'
     assert state['attempts'][0]['totalMs'] is None
     restored.get_by_text('Попытка 1 из 1').wait_for(timeout=5000)
@@ -229,7 +230,7 @@ def test_trainer_relocked_on_reload(browser):
     trainer(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data)
-    restored.get_by_role('heading',name='Вход администратора').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Вход Тренера').wait_for(timeout=5000)
     assert 'Управление занятием' not in restored.locator('body').inner_text()
     assert not errs+errs2,errs+errs2
     restored.close()
@@ -247,7 +248,7 @@ def test_intervals_20_taps(browser):
     assert counter.inner_text()=='1'
     for _ in range(19):tap(page)
     page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
-    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
+    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert len(state['attempts'])==1
     assert len(state['attempts'][0]['intervalsMs'])==20
     assert state['attempts'][0]['totalMs']==sum(state['attempts'][0]['intervalsMs'])
@@ -272,9 +273,9 @@ def test_migrate_legacy_v4_browser(browser):
          'selectedAthleteId':'athlete-default','sessions':[{'id':'old-1','athleteId':'athlete-default','createdAt':'2026-01-01T00:00:00.000Z','target':20,'status':'pending','exercises':[{'mode':'stopwatch','startedAt':'2026-01-01T00:00:00.000Z','endedAt':'2026-01-01T00:00:24.000Z','intervals':[],'totalMs':24000}]}],
          'archived':[],'incomplete':[]}
     original=json.dumps(old)
-    page,errors=make_page(browser,data={'interval-lab:data:v1':original},pin=False)
-    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v5")'))
-    assert state['schemaVersion']==5
+    page,errors=make_page(browser,data={'interval-lab:data:v1':original,'sidesteps:migration:pending:v1':json.dumps({'version':1,'athleteId':'athlete-default'})},pin=False)
+    state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
+    assert state['schemaVersion']==6
     assert state['workouts'][0]['status']=='legacy_pending'
     assert state['attempts'][0]['totalMs']==24000
     assert page.evaluate('localStorage.getItem("interval-lab:data:v1")')==original
@@ -283,7 +284,7 @@ def test_migrate_legacy_v4_browser(browser):
 
 if __name__=='__main__':
     with sync_playwright() as p:
-        browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+        browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
         for test in [test_adult,test_child_pair,test_resume_between_attempts,test_pin_no_config,test_rest_and_early_start,test_timeout_and_resume,test_restart_mid_attempt,test_trainer_relocked_on_reload,test_intervals_20_taps,test_min_tap_gap_500ms,test_migrate_legacy_v4_browser]:
             try:
                 out=test(browser);print('PASS',test.__name__)

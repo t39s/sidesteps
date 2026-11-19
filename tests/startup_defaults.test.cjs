@@ -146,7 +146,7 @@ test('reload retains the active participant session and the administrator login 
     assert.equal(page.state().device.soundEnabled, false);
     assert.equal(page.state().device.measurementMode, 'stopwatch');
     assert.deepEqual(page.state().childSessions, state.childSessions);
-    assert.match(page.html(), role === 'trainer' ? /Вход администратора/ : /Попытка 1 из 1/);
+    assert.match(page.html(), role === 'trainer' ? /Вход Тренера/ : /Попытка 1 из 1/);
   }
 });
 

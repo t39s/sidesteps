@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 5,
+  "revision": 3,
+  "athletes": [
+    {
+      "id": "athlete-default",
+      "name": "Спортсмен"
+    },
+    {
+      "id": "b216553e-1fd8-4f68-b024-0e6f7c90601c",
+      "name": "Второй"
+    }
+  ],
+  "workouts": [
+    {
+      "id": "d105943b-ef6d-407b-b3b2-bc75e37171a4",
+      "athleteId": "athlete-default",
+      "plannedAttempts": 2,
+      "kind": "solo",
+      "status": "pending",
+      "createdAt": "2026-11-19T19:15:31.770Z",
+      "completedAt": null,
+      "closeReason": null,
+      "attemptIds": [
+        "5c720ef6-9c44-4e1c-b0f6-8337b4bcbd6b"
+      ],
+      "baselineExistsAtStart": false,
+      "firstStartedAt": "2026-11-19T19:15:31.771Z",
+      "firstEndedAt": null
+    }
+  ],
+  "attempts": [
+    {
+      "id": "5c720ef6-9c44-4e1c-b0f6-8337b4bcbd6b",
+      "workoutId": "d105943b-ef6d-407b-b3b2-bc75e37171a4",
+      "athleteId": "athlete-default",
+      "ordinal": 1,
+      "mode": "stopwatch",
+      "status": "running",
+      "startedAt": "2026-11-19T19:15:31.771Z",
+      "endedAt": null,
+      "totalMs": null,
+      "intervalsMs": [],
+      "targetIntervals": null,
+      "recordEvent": false,
+      "previousRecordMs": null
+    }
+  ],
+  "childSessions": [],
+  "archived": [],
+  "incomplete": [],
+  "device": {
+    "lastInterface": "athlete",
+    "trainerActivated": false,
+    "soundEnabled": false,
+    "selectedAthleteId": "athlete-default",
+    "trainerAthleteId": "athlete-default",
+    "activeWorkoutId": "d105943b-ef6d-407b-b3b2-bc75e37171a4",
+    "activeChildSessionId": null,
+    "childParticipants": [],
+    "viewAthleteId": null,
+    "measurementMode": "intervals",
+    "soloPlannedAttempts": 2,
+    "soloMeasurementMode": "intervals"
+  }
+}

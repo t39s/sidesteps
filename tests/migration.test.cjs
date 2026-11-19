@@ -22,7 +22,7 @@ test('only selected athlete transferred; other source profiles untouched',()=>{
   const source=JSON.stringify(old()),s=storage({[G.LEGACY]:source,[G.PENDING]:request('athlete-a')});
   assert.equal(G.run(s,M).migrated,true);
   assert.equal(s.getItem(G.LEGACY),source);
-  const result=M.validate(JSON.parse(s.getItem(G.TARGET)));
+  const result=M.validateV5(JSON.parse(s.getItem(G.TARGET)));
   assert.deepEqual(result.athletes.map(a=>a.id),['athlete-a']);
   assert.equal(result.workouts.length,1);assert.equal(result.attempts.length,1);
   assert.equal(result.archived.length,1);assert.equal(result.incomplete.length,1);
@@ -48,7 +48,7 @@ test('existing nonempty history is never replaced',()=>{
   assert.ok(s.getItem(G.PENDING));
 });
 test('initial empty sidesteps placeholder can be replaced',()=>{
-  const s=storage({[G.LEGACY]:JSON.stringify(old()),[G.TARGET]:JSON.stringify(M.blank()),[G.PENDING]:request('athlete-a')});
+  const s=storage({[G.LEGACY]:JSON.stringify(old()),[G.TARGET]:JSON.stringify({...M.blank(),schemaVersion:5}),[G.PENDING]:request('athlete-a')});
   G.run(s,M);
   assert.equal(JSON.parse(s.getItem(G.TARGET)).athletes[0].id,'athlete-a');
 });

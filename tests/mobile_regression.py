@@ -1,4 +1,5 @@
 """Additional portrait/mobile checks; uses in-memory Chromium, not live HTTPS/PWA."""
+import os
 from playwright.sync_api import sync_playwright
 from browser_smoke import make_page, new_exercise, tap, trainer
 
@@ -50,7 +51,7 @@ def test_child_single_reload_and_early(browser):
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать занятие').click()
     assert p.locator('.child .app-head .mode-tag').count()==0
-    assert p.locator('footer').get_by_role('link',name='Войти').is_visible()
+    assert p.get_by_role('link',name='Войти').is_visible()
     tap(p);tap(p)
     p.get_by_role('button',name='Начать раньше').wait_for(timeout=5000)
     data=p.evaluate('window.__dump()');p.close()
@@ -63,7 +64,7 @@ def test_child_single_reload_and_early(browser):
     restored.mouse.down();restored.wait_for_timeout(210);restored.mouse.up()
     restored.get_by_text('Попытка 2 из 2').wait_for(timeout=2500)
     assert restored.locator('.child .app-head .mode-tag').count()==0
-    assert restored.locator('footer').get_by_role('link',name='Войти').is_visible()
+    assert restored.get_by_role('link',name='Войти').is_visible()
     tap(restored);tap(restored)
     restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors+errs,errors+errs
@@ -85,7 +86,7 @@ def test_history_chart_portrait(browser):
     }''')
     p.close()
     for width in (320,360,390):
-        q,errors=make_page(browser,{'interval-lab:data:v5':data},pin=False,viewport_width=width,mobile=True)
+        q,errors=make_page(browser,{'interval-lab:data:v6':data},pin=False,viewport_width=width,mobile=True)
         q.set_viewport_size({'width':width,'height':740})
         history=q.get_by_role('tab',name='История')
         exercise=q.get_by_role('tab',name='Новая тренировка')
@@ -145,8 +146,8 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.2.8 · Войти'
-        assert login.get_attribute('title')=='Для администратора'
+        assert footer.inner_text()=='sidesteps v. 0.3.0-rc.1 · Войти'
+        assert login.get_attribute('title')=='Для Тренера'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
         assert login.evaluate(font)==version.evaluate(font)
@@ -154,7 +155,7 @@ def test_history_chart_portrait(browser):
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
-        q.get_by_role('heading',name='Вход администратора').wait_for()
+        q.get_by_role('heading',name='Вход Тренера').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
         assert history.get_attribute('aria-selected')=='true'
@@ -168,7 +169,7 @@ def test_history_chart_portrait(browser):
 
 if __name__ == '__main__':
     with sync_playwright() as p:
-        b=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox'])
+        b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
         for test in [test_adult_long_press,test_child_early_without_reload,test_child_single_reload_and_early,test_history_chart_portrait]:
             test(b);print('PASS',test.__name__)
         b.close()

@@ -22,7 +22,7 @@
     state.device={...state.device,lastInterface:'athlete',trainerActivated:false,
       selectedAthleteId:athleteId,trainerAthleteId:athleteId,viewAthleteId:athleteId,
       activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};
-    return M.validate(state);
+    return M.validateV5(state);
   }
   function empty(state){
     return state.athletes.length===1&&state.athletes[0].id==='athlete-default'&&
@@ -36,6 +36,7 @@
     return fields.every(k=>JSON.stringify(a[k])===JSON.stringify(b[k]))&&a.childSessions.length===0;
   }
   function run(store,M){
+    if(store.getItem(M.KEY))return {blocked:false,migrated:false};
     const pending=store.getItem(PENDING);
     if(!pending)return {blocked:!store.getItem(TARGET)&&!!store.getItem(LEGACY),migrated:false};
     const request=JSON.parse(pending);
@@ -45,11 +46,11 @@
     const selected=select(JSON.parse(raw),request.athleteId,M);
     const current=store.getItem(TARGET);
     if(current){
-      const existing=M.validate(JSON.parse(current));
+      const existing=M.validateV5(JSON.parse(current));
       assert(empty(existing)||same(existing,selected),'В sidesteps уже есть другая история. Автоматический перенос заблокирован, данные сохранены.');
       if(!same(existing,selected))store.setItem(TARGET,JSON.stringify(selected));
     }else store.setItem(TARGET,JSON.stringify(selected));
-    const checked=M.validate(JSON.parse(store.getItem(TARGET)));
+    const checked=M.validateV5(JSON.parse(store.getItem(TARGET)));
     assert(same(checked,selected),'Не удалось подтвердить сохранение истории в sidesteps');
     const counts=Object.fromEntries(fields.map(k=>[k,selected[k].length]));
     store.setItem(DONE,JSON.stringify({version:1,athleteId:request.athleteId,athleteName:selected.athletes[0].name,counts,completedAt:new Date().toISOString()}));

@@ -7,7 +7,7 @@ test('product display name is sidesteps',()=>{
   assert.match(text('app.js'),/sidesteps/);
 });
 test('storage keys unchanged for historical migration',()=>{
-  assert.match(text('model.js'),/const KEY = 'interval-lab:data:v5', LEGACY_KEY = 'interval-lab:data:v1'/);
+  assert.match(text('model.js'),/const KEY = 'interval-lab:data:v6', LEGACY_KEY = 'interval-lab:data:v1', V5_KEY = 'interval-lab:data:v5'/);
 });
 test('new service worker cannot delete legacy PWA caches',()=>{
   const sw=text('sw.js');

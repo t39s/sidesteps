@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 5,
+  "revision": 1,
+  "athletes": [
+    {
+      "id": "athlete-default",
+      "name": "Спортсмен"
+    },
+    {
+      "id": "b216553e-1fd8-4f68-b024-0e6f7c90601c",
+      "name": "Второй"
+    }
+  ],
+  "workouts": [],
+  "attempts": [],
+  "childSessions": [],
+  "archived": [],
+  "incomplete": [],
+  "device": {
+    "lastInterface": "athlete",
+    "trainerActivated": false,
+    "soundEnabled": false,
+    "selectedAthleteId": "athlete-default",
+    "trainerAthleteId": "athlete-default",
+    "activeWorkoutId": null,
+    "activeChildSessionId": null,
+    "childParticipants": [],
+    "viewAthleteId": null,
+    "measurementMode": "intervals",
+    "soloPlannedAttempts": 2,
+    "soloMeasurementMode": "intervals"
+  }
+}
