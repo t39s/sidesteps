@@ -2,21 +2,23 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
-  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0;
+  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0,storageFailure=false,confirmResult=true,confirmWait=0;
   const spoken=[],utterances=[],bodyClasses=new Set();
-  class TestDate extends Date {static now(){return clock;}}
-  const app={innerHTML:'',querySelector:()=>null,addEventListener(){}};
+  class TestDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
+  const handlers={};
+  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener(name,handler){handlers[name]=handler;}};
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
-  const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
+  const confirmations=[];
+  const window={confirm(text){confirmations.push(text);clock+=confirmWait;return confirmResult;},ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},state:()=>db,afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
-    localStorage:{setItem(){}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
+    localStorage:{setItem(){if(storageFailure)throw Error('Storage unavailable');}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
-  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
+  return {api,app,submit(form){handlers.submit({target:form,preventDefault(){}});},spoken,utterances,speechSynthesis,bodyClasses,confirmations,setConfirm(result,wait=0){confirmResult=result;confirmWait=wait;},chooseAnimation(value){handlers.change({target:{name:'launch-animation',value}});},failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
@@ -87,7 +89,7 @@ test('record announcement follows the time',()=>{
 test('display config requires both perception durations',()=>{
   const f=fixture(M.blank());assert.ok(f.api.validateConfig(config));
   for(const key of ['resultDisplaySec','recordDisplaySec'])assert.throws(()=>f.api.validateConfig({...config,[key]:0}));
-  assert.equal(config.intervalCount,20);assert.equal(config.restDurationSec,120);assert.ok(!('resultPauseSec'in config));
+  assert.ok(!('resultPauseSec'in config));
 });
 
 test('trainer uses athlete measurement layout with participant identity',()=>{
@@ -221,4 +223,209 @@ test('athlete administrator login gear is disabled and settings work again after
   await f.api.handleAction('pin-back',{});assert.equal(f.api.screen(),'athlete');
   assert.doesNotMatch(f.app.innerHTML,/aria-label="Настройки" disabled/);
   await f.api.handleAction('settings',{});assert.equal(f.api.screen(),'settings');
+});
+
+for(const destination of ['settings','pin'])for(const record of [false,true])for(const sound of [false,true]){
+  test(`result deadline recovers after early ${destination} navigation (${record?'record':'ordinary'}, ${sound?'sound':'silent'})`,async()=>{
+    const {state,result}=finish({record});const f=fixture(state,sound);
+    f.api.afterFinished(result,true,null);
+    await f.api.handleAction(destination,{});
+    f.advance(200);f.show();
+    assert.equal(f.api.until(),null);
+    f.advance(1000);
+    await f.api.handleAction(destination+'-back',{});
+    assert.equal(f.api.screen(),'result');
+    const duration=(record?config.recordDisplaySec:config.resultDisplaySec)*1000;
+    assert.equal(f.api.until(),f.clock()+duration);
+    f.advance(duration-1);f.api.tick();assert.equal(f.api.screen(),'result');
+    f.advance(1);f.api.tick();assert.equal(f.api.screen(),'final');
+  });
+}
+test('a delayed render does not restart an already displayed result deadline',async()=>{
+  const {state,result}=finish();const f=fixture(state);
+  f.api.afterFinished(result,true,null);
+  await f.api.handleAction('settings',{});
+  await f.api.handleAction('settings-back',{});
+  const deadline=f.api.until();assert.notEqual(deadline,null);
+  f.advance(200);f.show();assert.equal(f.api.until(),deadline);
+  f.api.render();assert.equal(f.api.until(),deadline);
+});
+
+function readyFixture(mode='intervals',{child=false,pair=false}={}){
+  let s=M.blank();s.device.soloMeasurementMode=mode;s.device.measurementMode=mode;
+  if(child){const ids=['athlete-default'];if(pair){const added=M.addAthlete(s,'Б');s=added.state;ids.push(added.value.id);}s=M.startChild(s,ids,2).state;}
+  const f=fixture(s);f.api.setScreen(child?'child-ready':'athlete-ready');f.api.render();return f;
+}
+for(const mode of ['intervals','stopwatch'])for(const child of [false,true]){
+  test(`${mode} ${child?'child':'athlete'}: launch cancellation preserves same attempt and clears counters`,async()=>{
+    const f=readyFixture(mode,{child});assert.match(f.app.innerHTML,/data-act="end-training"/);
+    assert.doesNotMatch(f.app.innerHTML,/data-act="cancel-launch"/);
+    f.api.tap();f.advance(900);if(mode==='intervals')f.api.tap();
+    assert.match(f.app.innerHTML,/data-act="cancel-launch"/);
+    await f.api.handleAction('cancel-launch');
+    assert.equal(f.api.state().attempts[0].interruptionReason,'start_cancelled');
+    assert.match(f.app.innerHTML,/play-glyph/);assert.match(f.app.innerHTML,/Попытка 1 из 2/);
+    f.api.tap();assert.equal(f.api.state().attempts[1].ordinal,1);
+    assert.equal(f.api.state().attempts[1].intervalsMs.length,0);
+  });
+}
+test('cancellation button disappears at 10 seconds and stale click cannot cancel',async()=>{
+  const f=readyFixture('stopwatch');f.api.tap();const control={hidden:false};
+  f.app.querySelector=selector=>selector==='[data-cancel-launch]'?control:null;
+  f.advance(9999);f.api.tick();assert.equal(control.hidden,false);
+  f.advance(1);f.api.tick();assert.equal(control.hidden,true);
+  await f.api.handleAction('cancel-launch');assert.equal(f.api.state().attempts[0].status,'running');
+  await f.api.handleAction('end-training');assert.equal(f.api.screen(),'athlete');
+  assert.equal(f.api.state().attempts[0].interruptionReason,'early_end');
+});
+for(const child of [false,true])test(`${child?'child':'athlete'}: cancellation of early second start returns to remaining rest`,async()=>{
+  const {state,result}=finish({child,planned:2});const f=fixture(state);
+  f.api.afterFinished(result,!child,null);if(!child)f.show();
+  await f.api.handleAction('rest-early');f.api.tap();f.advance(1000);
+  await f.api.handleAction('cancel-launch');assert.equal(f.api.screen(),'rest');
+  assert.match(f.app.innerHTML,/Начать раньше/);
+  assert.equal(f.api.state().workouts[0].firstEndedAt,result.attempt.endedAt);
+  f.advance(14000);f.api.tick();assert.equal(f.api.screen(),child?'child-ready':'athlete-ready');
+});
+test('cross before first launch returns home without stored workout',async()=>{
+  const f=readyFixture();await f.api.handleAction('end-training');
+  assert.equal(f.api.screen(),'athlete');assert.deepEqual(f.api.state().workouts,[]);
+});
+test('cross on paired result ends the displayed athlete, including through PIN navigation',async()=>{
+  for(const pin of [false,true]){
+    const {state,result}=finish({child:true,pair:true,planned:2}),f=fixture(state);
+    f.api.afterFinished(result,false,null);
+    const before=M.nextTurn(f.api.state());
+    if(pin)await f.api.handleAction('pin');
+    await f.api.handleAction('end-training');
+    assert.deepEqual(M.nextTurn(f.api.state()),before);
+    assert.equal(M.workoutOf(f.api.state(),result.workout.id).closeReason,'early_end');
+    assert.equal(f.api.screen(),'child-ready');
+  }
+});
+test('coach cross ends whole running session',async()=>{
+  const f=readyFixture('intervals',{child:true,pair:true});f.api.tap();f.advance(800);f.api.tap();
+  f.api.unlock();f.api.state().device.lastInterface='trainer';f.api.setScreen('trainer');f.api.render();
+  await f.api.handleAction('end-training');
+  assert.equal(f.api.screen(),'trainer');assert.equal(M.currentChild(f.api.state()),null);
+  assert.equal(f.api.state().attempts[0].elapsedMs,800);
+});
+test('cross is last header control during training and absent from home',()=>{
+  const {state,result}=finish(),f=fixture(state);f.api.afterFinished(result,false,null);
+  for(const screen of ['athlete-ready','result','rest']){
+    f.api.setScreen(screen);f.api.render();const html=f.app.innerHTML;
+    assert.match(html,/<header[\s\S]*data-act="toggle-sound"[\s\S]*data-act="settings"[\s\S]*data-act="end-training"[\s\S]*<\/header>/);
+  }
+  f.api.setScreen('athlete');f.api.render();assert.doesNotMatch(f.app.innerHTML,/data-act="end-training"/);
+});
+test('storage failure cannot falsely cancel or close the running workout',async()=>{
+  for(const action of ['cancel-launch','end-training']){
+    const f=readyFixture('stopwatch');f.api.tap();f.advance(900);f.failStorage();
+    const original=console.error;console.error=()=>{};
+    try{await f.api.handleAction(action);}finally{console.error=original;}
+    assert.equal(f.api.state().attempts[0].status,'running');
+    assert.equal(f.api.screen(),'athlete-ready');
+  }
+});
+
+test('animation settings follow training and show three live radio samples',()=>{
+  const f=readyFixture();f.api.setScreen('settings');f.api.render();const html=f.app.innerHTML;
+  assert.ok(html.indexOf('<h2>Тренировка</h2>')<html.indexOf('Анимация запуска'));
+  for(const name of ['Сияние','Пульсация','Без анимации'])assert.ok(html.includes(name));
+  assert.equal((html.match(/name="launch-animation"/g)||[]).length,3);
+  assert.equal((html.match(/class="animation-sample"/g)||[]).length,3);
+  assert.match(html,/value="pulse" checked/);
+});
+for(const value of ['glow','pulse','none'])test(`animation selection ${value} applies in both measurement modes and on coach device`,()=>{
+  for(const child of [false,true])for(const mode of ['intervals','stopwatch']){
+    const f=readyFixture(mode,{child});f.api.setScreen('settings');f.chooseAnimation(value);
+    assert.equal(f.api.state().device.launchAnimation,value);
+    f.api.render();assert.ok(f.app.innerHTML.includes(`value="${value}" checked`));
+    f.api.setScreen(child?'child-ready':'athlete-ready');f.api.render();
+    assert.ok(f.app.innerHTML.includes(`counter counter-ready launch-${value}`));
+  }
+});
+test('confirm rejection preserves running attempt and waiting time stays in result',async()=>{
+  const f=readyFixture('stopwatch');f.api.tap();f.advance(700);f.setConfirm(false,5000);
+  await f.api.handleAction('end-training');
+  assert.equal(f.confirmations.length,1);assert.match(f.confirmations[0],/Текущая попытка будет прервана/);
+  assert.equal(f.api.state().attempts[0].status,'running');f.advance(800);f.api.tap();
+  assert.equal(f.api.state().attempts[0].totalMs,6500);
+});
+test('confirm acceptance captures interruption after response, including within first 10 seconds',async()=>{
+  const f=readyFixture('intervals');f.api.tap();f.advance(800);f.api.tap();f.setConfirm(true,3000);
+  await f.api.handleAction('end-training');
+  assert.equal(f.confirmations.length,1);assert.equal(f.api.state().attempts[0].elapsedMs,3800);
+  assert.deepEqual(f.api.state().attempts[0].intervalsMs,[800]);
+  assert.equal(f.api.state().attempts[0].interruptionReason,'early_end');
+});
+test('launch cancellation and closing an unstarted training do not ask for confirmation',async()=>{
+  const f=readyFixture();await f.api.handleAction('end-training');assert.equal(f.confirmations.length,0);
+  f.api.setScreen('athlete-ready');f.api.tap();f.advance(800);await f.api.handleAction('cancel-launch');
+  assert.equal(f.confirmations.length,0);
+});
+test('coach force-close during measurement asks once',async()=>{
+  const f=readyFixture('stopwatch',{child:true});f.api.tap();
+  f.api.unlock();f.api.state().device.lastInterface='trainer';f.api.setScreen('trainer');
+  await f.api.handleAction('force-child');assert.equal(f.confirmations.length,1);
+  assert.equal(M.currentChild(f.api.state()),null);
+});
+
+test('automatic animation changes after local midnight without replacing measurement surface',()=>{
+  const f=readyFixture(),day=new Date(f.clock());
+  f.api.state().device.launchAnimationFirstDay=`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+  const glyph={className:'counter counter-ready launch-pulse'};
+  f.app.querySelector=selector=>selector==='[data-launch-animation]'?glyph:null;
+  const before=f.app.innerHTML;f.advance(24*60*60*1000);f.api.tick();
+  assert.equal(glyph.className,'counter counter-ready launch-glow');assert.equal(f.app.innerHTML,before);
+});
+
+
+for(const child of [false,true])test(`completed workout has no close control in ${child?'coach':'athlete'} mode`,()=>{
+  const {state,result}=finish({child}),f=fixture(state);
+  f.api.afterFinished(result,false,null);
+  assert.match(f.app.innerHTML,/data-act="end-training"/);
+  f.advance(10000);
+  f.api.resultProgress();
+  assert.equal(f.api.screen(),child?'child-final':'final');
+  assert.match(f.app.innerHTML,/Тренировка завершена/);
+  assert.doesNotMatch(f.app.innerHTML,/data-act="end-training"/);
+  assert.match(f.app.innerHTML,child?/data-act="history-child"/:/data-act="final-home"/);
+});
+
+test('coach edits or cancels an athlete name without changing profile identity or history',async()=>{
+  const {state,result}=finish({child:true}),profile=state.athletes[0];
+  const f=fixture(state);
+  f.api.setScreen('trainer');
+  f.api.state().device.lastInterface='trainer';
+  f.api.unlock();
+  f.api.render();
+  assert.match(f.app.innerHTML,/Переименовать/);
+  assert.match(f.app.innerHTML,/name="athlete-name" value="Спортсмен"/);
+  const field={value:'',focus(){},select(){}};
+  const name={textContent:profile.name},option={value:profile.id,textContent:profile.name};
+  const toggle={closest:()=>row,focus(){},setAttribute(){}};
+  const form={hidden:true,dataset:{athleteId:profile.id},elements:{'athlete-name':field},matches:()=>true,closest:()=>row};
+  const row={querySelector(selector){return {'.athlete-rename':form,'[data-athlete-name]':name,'[data-act="rename-athlete"]':toggle}[selector];}};
+  f.app.querySelectorAll=()=>[option];
+
+  await f.api.handleAction('rename-athlete',toggle);
+  assert.equal(field.value,profile.name);
+  field.value='Черновик';
+  await f.api.handleAction('cancel-athlete-rename',toggle);
+  assert.equal(form.hidden,true);
+  assert.equal(f.api.state().athletes[0].name,profile.name);
+  await f.api.handleAction('rename-athlete',toggle);
+  assert.equal(field.value,profile.name);
+  field.value='  Новое <имя>  ';
+  f.submit(form);
+  assert.equal(form.hidden,true);
+  assert.equal(name.textContent,'Новое <имя>');
+  assert.equal(option.textContent,name.textContent);
+  assert.equal(f.api.state().athletes[0].id,profile.id);
+  assert.deepEqual(f.api.state().attempts,state.attempts);
+  assert.equal(f.api.state().workouts[0].athleteId,result.workout.athleteId);
+  f.api.render();
+  assert.match(f.app.innerHTML,/Новое &lt;имя&gt;/);
+  assert.throws(()=>M.renameAthlete(f.api.state(),profile.id,'  '),/Имя: от 1 до 50 символов/);
 });

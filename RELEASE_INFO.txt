@@ -1,8 +1,7 @@
-sidesteps v0.2.10
-Release date: 2026-11-18
-Status: STABLE RELEASE
-Base: v0.2.9 (315a2f7ac26fe8a20e1d42e07e65942edb1d2e1a)
-Accepted candidate: v0.2.10-rc.1 (eea203185c429d75b3a11c3dc5eea8b22daf6a35)
+sidesteps v0.2.11
+Release date: 2026-11-19
+Status: STABLE
+Accepted candidate: v0.2.11-rc.7 (363ac518a5492c09f88d577f718ad0cddd4d60cb)
+Previous stable: v0.2.10
 Branch: main
-Change: administrator PIN verifier rotated; plaintext PIN is not stored.
-Training preset unchanged: 20 intervals, rest 120 seconds.
+Production preset: 20 intervals; rest 120 seconds.

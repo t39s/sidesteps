@@ -102,3 +102,29 @@ body.trainer-theme{background:#321B27}
 
 .stopwatch-counter{display:flex;align-items:center;justify-content:center;min-height:clamp(204px,54vw,420px);font-size:clamp(64px,18vw,136px);font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap}
 .toolbar .settings-icon:disabled{color:#929292;opacity:1}
+
+.close-glyph{display:block;width:calc(.7 * var(--brand-height));height:calc(.7 * var(--brand-height));pointer-events:none}
+[data-cancel-launch][hidden]{display:none}
+
+.header-controls.training-controls{gap:0}
+
+/* All three samples use the same glyph and animation rules as the launch screen. */
+.counter-ready.launch-glow{filter:drop-shadow(0 0 .035em #ffd166);animation:play-shine 1.8s ease-in-out infinite}
+@keyframes play-shine{
+  0%,100%{filter:drop-shadow(0 0 .025em #ffd16680)}
+  50%{filter:drop-shadow(0 0 .065em #ffd166)}
+}
+.counter-ready.launch-none{animation:none;filter:none}
+.animation-options{display:grid;gap:.5rem}
+.animation-option{display:grid;grid-template-columns:4.5rem minmax(0,1fr) auto;align-items:center;gap:.75rem;margin:0;padding:.5rem .75rem;border:1px solid var(--line);border-radius:13px;color:var(--text);font-size:1rem;cursor:pointer;min-height:5rem}
+.animation-option:has(input:checked){border-color:var(--accent);background:var(--card2)}
+.animation-option:focus-within{outline:2px solid var(--cyan);outline-offset:2px}
+.animation-option input{width:1.25rem;height:1.25rem;min-height:0;margin:0;padding:0;accent-color:var(--accent)}
+.animation-sample{display:grid;place-items:center;font-size:3.5rem;overflow:visible}
+.animation-sample .counter-ready{width:1em;height:1em}
+
+.athlete-row + .athlete-row{border-top:1px solid var(--line)}
+.athlete-row-controls{display:grid;grid-template-columns:minmax(0,1fr)}
+.athlete-row-controls > span{overflow-wrap:anywhere}
+.athlete-row-actions{display:flex;flex-wrap:wrap;gap:.4rem}
+.athlete-rename{padding-bottom:.75rem}
