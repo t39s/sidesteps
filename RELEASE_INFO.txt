@@ -1,9 +1,9 @@
-sidesteps v0.2.11-rc.4
+sidesteps v0.2.11-rc.5
 Release date: 2026-11-19
 Status: PREVIEW — awaiting owner acceptance
-Base candidate: b686858e8864b21aee44c130d04602fe1e3c1ff7
+Base candidate: 9d209543f6d03171a7e84b1343f0090000d7cf99
 Stable base: v0.2.10
 Branch: develop
-Changes: first local day pulses; following days glow; persistent manual animation choice takes precedence in both athlete and coach modes.
+Changes: reset records the first local animation day immediately, allowing Glow on subsequent days without a reload.
 Preview test preset: 4 intervals; rest 20 seconds.
 Browser acceptance: owner.

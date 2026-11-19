@@ -11,11 +11,13 @@ const config = require('../config.json');
 async function openPage(storage, wallTime = null) {
   const events = {};
   let onTick;
+  const renderTimers = [];
   class PageDate extends Date {
     constructor(...args) { super(...(args.length ? args : [wallTime ?? Date.now()])); }
     static now() { return wallTime ?? Date.now(); }
   }
 
+  const browser = { ILModel: M, SideMigration: { run: () => ({}) }, confirm: () => true, addEventListener() {} };
   const app = {
     innerHTML: '',
     querySelector: () => null,
@@ -23,23 +25,26 @@ async function openPage(storage, wallTime = null) {
     addEventListener(name, handler) { events[name] = handler; },
   };
   let time = 1000;
-  vm.runInNewContext(source, {
-    window: { ILModel: M, SideMigration: { run: () => ({}) }, addEventListener() {} },
+  vm.runInNewContext(source.replace('init();\n})();', 'window.testUnlockTrainer=()=>{trainerUnlocked=true;};\ninit();\n})();'), {
+    window: browser,
     document: { getElementById: () => app, addEventListener() {} },
     localStorage: {
       getItem: key => storage.get(key) ?? null,
       setItem: (key, value) => storage.set(key, value),
+      removeItem: key => storage.delete(key),
     },
     fetch: async () => ({ ok: true, json: async () => config }),
     navigator: {}, Date: PageDate,
     performance: { now: () => time },
-    setInterval(fn) { onTick = fn; }, setTimeout() {}, clearTimeout() {}, console,
+    setInterval(fn) { onTick = fn; }, setTimeout(fn, delay) { if(delay===200)renderTimers.push(fn); }, clearTimeout() {}, console,
   });
   await new Promise(resolve => setImmediate(resolve));
   return {
     html: () => app.innerHTML,
+    unlockTrainer: browser.testUnlockTrainer,
     setDate(value) { wallTime = Date.parse(value); },
     tick() { onTick(); },
+    renderResult() { for(const fn of renderTimers.splice(0))fn(); },
     state: () => JSON.parse(storage.get(M.KEY)),
     click(act) {
       const button = { dataset: { act }, matches: () => false, setAttribute() {} };
@@ -207,4 +212,36 @@ test('automatic animation uses calendar day across year boundary, not 24 elapsed
   assert.equal(page.state().device.launchAnimationFirstDay,'2026-12-31');
   const next=await openPage(storage,Date.parse('2027-01-01T00:01:00'));next.click('open-exercise');
   assert.ok(next.html().includes('counter counter-ready launch-glow'));
+});
+
+
+test('in-app reset starts a new animation day and glow takes over after a completed workout without reload', async () => {
+  const previous = M.blank();
+  previous.device.launchAnimation = 'pulse';
+  previous.device.launchAnimationFirstDay = '2026-11-01';
+  const storage = storeState(previous);
+  const page = await openPage(storage, Date.parse('2026-11-19T08:00:00'));
+  page.unlockTrainer();
+  page.click('reset-all');
+  assert.equal(page.state().device.launchAnimation, undefined);
+
+  page.click('settings');
+  page.change('attempt-count', '1');
+  page.change('mode-select', 'stopwatch');
+  page.click('settings-back');
+  page.click('open-exercise');
+  assert.match(page.html(), /counter counter-ready launch-pulse/);
+  page.tap();
+  page.tap();
+  assert.equal(page.state().workouts[0].status, 'completed');
+  page.renderResult();
+  page.setDate('2026-11-19T08:01:00');
+  page.tick();
+  assert.match(page.html(), /Тренировка завершена/);
+  page.click('final-home');
+
+  page.setDate('2026-11-21T08:00:00');
+  page.click('open-exercise');
+  assert.match(page.html(), /counter counter-ready launch-glow/);
+  assert.equal(page.state().device.launchAnimationFirstDay, '2026-11-19');
 });
