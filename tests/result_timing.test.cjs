@@ -2,21 +2,21 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
-  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0;
+  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0,storageFailure=false;
   const spoken=[],utterances=[],bodyClasses=new Set();
-  class TestDate extends Date {static now(){return clock;}}
-  const app={innerHTML:'',querySelector:()=>null,addEventListener(){}};
+  class TestDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
+  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener(){}};
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
   const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},state:()=>db,afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
-    localStorage:{setItem(){}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
+    localStorage:{setItem(){if(storageFailure)throw Error('Storage unavailable');}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
-  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
+  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
@@ -247,4 +247,81 @@ test('a delayed render does not restart an already displayed result deadline',as
   const deadline=f.api.until();assert.notEqual(deadline,null);
   f.advance(200);f.show();assert.equal(f.api.until(),deadline);
   f.api.render();assert.equal(f.api.until(),deadline);
+});
+
+function readyFixture(mode='intervals',{child=false,pair=false}={}){
+  let s=M.blank();s.device.soloMeasurementMode=mode;s.device.measurementMode=mode;
+  if(child){const ids=['athlete-default'];if(pair){const added=M.addAthlete(s,'Б');s=added.state;ids.push(added.value.id);}s=M.startChild(s,ids,2).state;}
+  const f=fixture(s);f.api.setScreen(child?'child-ready':'athlete-ready');f.api.render();return f;
+}
+for(const mode of ['intervals','stopwatch'])for(const child of [false,true]){
+  test(`${mode} ${child?'child':'athlete'}: launch cancellation preserves same attempt and clears counters`,async()=>{
+    const f=readyFixture(mode,{child});assert.match(f.app.innerHTML,/data-act="end-training"/);
+    assert.doesNotMatch(f.app.innerHTML,/data-act="cancel-launch"/);
+    f.api.tap();f.advance(900);if(mode==='intervals')f.api.tap();
+    assert.match(f.app.innerHTML,/data-act="cancel-launch"/);
+    await f.api.handleAction('cancel-launch');
+    assert.equal(f.api.state().attempts[0].interruptionReason,'start_cancelled');
+    assert.match(f.app.innerHTML,/play-glyph/);assert.match(f.app.innerHTML,/Попытка 1 из 2/);
+    f.api.tap();assert.equal(f.api.state().attempts[1].ordinal,1);
+    assert.equal(f.api.state().attempts[1].intervalsMs.length,0);
+  });
+}
+test('cancellation button disappears at 10 seconds and stale click cannot cancel',async()=>{
+  const f=readyFixture('stopwatch');f.api.tap();const control={hidden:false};
+  f.app.querySelector=selector=>selector==='[data-cancel-launch]'?control:null;
+  f.advance(9999);f.api.tick();assert.equal(control.hidden,false);
+  f.advance(1);f.api.tick();assert.equal(control.hidden,true);
+  await f.api.handleAction('cancel-launch');assert.equal(f.api.state().attempts[0].status,'running');
+  await f.api.handleAction('end-training');assert.equal(f.api.screen(),'athlete');
+  assert.equal(f.api.state().attempts[0].interruptionReason,'early_end');
+});
+for(const child of [false,true])test(`${child?'child':'athlete'}: cancellation of early second start returns to remaining rest`,async()=>{
+  const {state,result}=finish({child,planned:2});const f=fixture(state);
+  f.api.afterFinished(result,!child,null);if(!child)f.show();
+  await f.api.handleAction('rest-early');f.api.tap();f.advance(1000);
+  await f.api.handleAction('cancel-launch');assert.equal(f.api.screen(),'rest');
+  assert.match(f.app.innerHTML,/Начать раньше/);
+  assert.equal(f.api.state().workouts[0].firstEndedAt,result.attempt.endedAt);
+  f.advance(14000);f.api.tick();assert.equal(f.api.screen(),child?'child-ready':'athlete-ready');
+});
+test('cross before first launch returns home without stored workout',async()=>{
+  const f=readyFixture();await f.api.handleAction('end-training');
+  assert.equal(f.api.screen(),'athlete');assert.deepEqual(f.api.state().workouts,[]);
+});
+test('cross on paired result ends the displayed athlete, including through PIN navigation',async()=>{
+  for(const pin of [false,true]){
+    const {state,result}=finish({child:true,pair:true,planned:2}),f=fixture(state);
+    f.api.afterFinished(result,false,null);
+    const before=M.nextTurn(f.api.state());
+    if(pin)await f.api.handleAction('pin');
+    await f.api.handleAction('end-training');
+    assert.deepEqual(M.nextTurn(f.api.state()),before);
+    assert.equal(M.workoutOf(f.api.state(),result.workout.id).closeReason,'early_end');
+    assert.equal(f.api.screen(),'child-ready');
+  }
+});
+test('coach cross ends whole running session',async()=>{
+  const f=readyFixture('intervals',{child:true,pair:true});f.api.tap();f.advance(800);f.api.tap();
+  f.api.unlock();f.api.state().device.lastInterface='trainer';f.api.setScreen('trainer');f.api.render();
+  await f.api.handleAction('end-training');
+  assert.equal(f.api.screen(),'trainer');assert.equal(M.currentChild(f.api.state()),null);
+  assert.equal(f.api.state().attempts[0].elapsedMs,800);
+});
+test('cross is last header control throughout training and absent from home',()=>{
+  const {state,result}=finish(),f=fixture(state);f.api.afterFinished(result,false,null);
+  for(const screen of ['athlete-ready','result','rest','final','child-final']){
+    f.api.setScreen(screen);f.api.render();const html=f.app.innerHTML;
+    assert.match(html,/<header[\s\S]*data-act="toggle-sound"[\s\S]*data-act="settings"[\s\S]*data-act="end-training"[\s\S]*<\/header>/);
+  }
+  f.api.setScreen('athlete');f.api.render();assert.doesNotMatch(f.app.innerHTML,/data-act="end-training"/);
+});
+test('storage failure cannot falsely cancel or close the running workout',async()=>{
+  for(const action of ['cancel-launch','end-training']){
+    const f=readyFixture('stopwatch');f.api.tap();f.advance(900);f.failStorage();
+    const original=console.error;console.error=()=>{};
+    try{await f.api.handleAction(action);}finally{console.error=original;}
+    assert.equal(f.api.state().attempts[0].status,'running');
+    assert.equal(f.api.screen(),'athlete-ready');
+  }
 });

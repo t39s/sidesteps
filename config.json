@@ -10,5 +10,6 @@
     "saltB64": "KYLQMr58mWTyd1y9OahYyA==",
     "verifierB64": "mV9/SEu5XdhFJhrthr69osGKn+v0k0jqpd5qBjN5kPo="
   },
-  "recordDisplaySec": 10
+  "recordDisplaySec": 10,
+  "attemptCancelWindowSec": 10
 }

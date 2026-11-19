@@ -102,3 +102,8 @@ body.trainer-theme{background:#321B27}
 
 .stopwatch-counter{display:flex;align-items:center;justify-content:center;min-height:clamp(204px,54vw,420px);font-size:clamp(64px,18vw,136px);font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap}
 .toolbar .settings-icon:disabled{color:#929292;opacity:1}
+
+.close-glyph{display:block;width:calc(.7 * var(--brand-height));height:calc(.7 * var(--brand-height));pointer-events:none}
+[data-cancel-launch][hidden]{display:none}
+
+.header-controls.training-controls{gap:0}

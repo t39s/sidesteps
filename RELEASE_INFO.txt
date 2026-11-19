@@ -1,8 +1,9 @@
-sidesteps v0.2.11-rc.1
+sidesteps v0.2.11-rc.2
 Release date: 2026-11-19
 Status: PREVIEW — awaiting owner acceptance
-Base: v0.2.10 (efbea396a777da132256f1cd538fabaf4b8140cc)
+Base candidate: c03490f321d966bf8a0acabd9c086ca870fd9518
+Stable base: v0.2.10
 Branch: develop
-Fix: result deadline initializes on first display, including return from settings or administrator login during delayed rendering.
-Result perception: ordinary 5 seconds, record 10 seconds; sound independent.
+Changes: launch cancellation before 10 seconds; rightmost close control; early workout/session completion; partial measurement persistence and derived event log.
 Preview test preset: 4 intervals; rest 20 seconds.
+Browser acceptance: owner.
