@@ -122,3 +122,9 @@ body.trainer-theme{background:#321B27}
 .animation-option input{width:1.25rem;height:1.25rem;min-height:0;margin:0;padding:0;accent-color:var(--accent)}
 .animation-sample{display:grid;place-items:center;font-size:3.5rem;overflow:visible}
 .animation-sample .counter-ready{width:1em;height:1em}
+
+.athlete-row + .athlete-row{border-top:1px solid var(--line)}
+.athlete-row-controls{flex-wrap:wrap}
+.athlete-row-controls > span{overflow-wrap:anywhere}
+.athlete-row-actions{display:flex;flex-wrap:wrap;gap:.4rem}
+.athlete-rename{padding-bottom:.75rem}

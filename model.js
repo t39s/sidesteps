@@ -40,7 +40,20 @@
   const attemptOf = (s,id) => s.attempts.find(a=>a.id===id);
   const currentChild = s => s.childSessions.find(c=>c.id===s.device.activeChildSessionId && c.status==='active')||null;
   function mutation(s,fn){const next=clone(s);const val=fn(next);next.revision++;validate(next);return {state:next,value:val};}
-  function addAthlete(s,name){return mutation(s,n=>{assert(typeof name==='string'&&name.trim().length>0&&name.trim().length<=50,'Имя: от 1 до 50 символов');assert(n.athletes.length<100,'Слишком много спортсменов');const a={id:id(),name:name.trim()};n.athletes.push(a);return a;});}
+  function athleteName(name){
+    const trimmed=typeof name==='string'?name.trim():'';
+    assert(trimmed.length>0&&trimmed.length<=50,'Имя: от 1 до 50 символов');
+    return trimmed;
+  }
+  function addAthlete(s,name){return mutation(s,n=>{const cleanName=athleteName(name);assert(n.athletes.length<100,'Слишком много спортсменов');const a={id:id(),name:cleanName};n.athletes.push(a);return a;});}
+  function renameAthlete(s,athleteId,name){
+    return mutation(s,state=>{
+      const profile=state.athletes.find(a=>a.id===athleteId);
+      assert(profile,'Спортсмен не найден');
+      profile.name=athleteName(name);
+      return profile;
+    });
+  }
   function newWorkout(n,athleteId,plannedAttempts,kind='solo'){assert(n.athletes.some(a=>a.id===athleteId),'Нет такого спортсмена');assert([1,2].includes(plannedAttempts),'Число попыток 1 или 2');const w={id:id(),athleteId,plannedAttempts,kind,status:'pending',createdAt:iso(),completedAt:null,closeReason:null,attemptIds:[],baselineExistsAtStart:baseline(n,athleteId)!==null,firstStartedAt:null,firstEndedAt:null};n.workouts.push(w);return w;}
   function addArchived(s,athleteId,dateString,bestMs){return mutation(s,n=>{assert(n.athletes.some(a=>a.id===athleteId),'Неизвестный спортсмен');assert(/^\d{4}-\d{2}-\d{2}$/.test(dateString)&&!Number.isNaN(Date.parse(dateString+'T00:00:00Z')),'Некорректная дата');assert(validMs(bestMs),'Некорректное время');const item={id:id(),athleteId,date:dateString,bestMs};n.archived.push(item);return item;});}
   function startSolo(s,athleteId,plannedAttempts){return mutation(s,n=>{assert(!currentChild(n),'Сначала завершите занятие');assert(!n.device.activeWorkoutId,'Уже есть активная тренировка');const w=newWorkout(n,athleteId,plannedAttempts);n.device.activeWorkoutId=w.id;return w;});}
@@ -118,5 +131,5 @@
     n.archived=(old.archived||[]).map(a=>({id:'legacy-archive:'+a.id,athleteId:a.athleteId,date:a.date,bestMs:a.bestMs}));n.incomplete=(old.incomplete||[]).map(a=>({...a,id:'legacy-incomplete:'+a.id}));validate(n);return n;}
   function merge(s,imported){validate(s);validate(imported);return mutation(s,n=>{const importedAthletes=new Map(imported.athletes.map(a=>[a.id,a]));for(const [aid,a] of importedAthletes){let found=n.athletes.find(x=>x.id===aid);if(found){assert(found.name===a.name,'Конфликт профиля');}else n.athletes.push(a);}for(const field of ['attempts','workouts','childSessions','archived','incomplete']){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(x);else assert(JSON.stringify(old)===JSON.stringify(x),'Конфликт при импорте: '+x.id);}}return true;});}
   function renderChartData(s,athleteId){const ws=publicWorkouts(s,athleteId);return ws.map(w=>({id:w.id,when:w.createdAt,ms:best(s,w)}));}
-  return {KEY,LEGACY_KEY,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
+  return {KEY,LEGACY_KEY,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
 });

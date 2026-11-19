@@ -1,9 +1,9 @@
-sidesteps v0.2.11-rc.5
+sidesteps v0.2.11-rc.6
 Release date: 2026-11-19
 Status: PREVIEW — awaiting owner acceptance
-Base candidate: 9d209543f6d03171a7e84b1343f0090000d7cf99
+Base candidate: e1e97eb9e50d0a692164894a127bae072bf11a34
 Stable base: v0.2.10
 Branch: develop
-Changes: reset records the first local animation day immediately, allowing Glow on subsequent days without a reload.
+Changes: remove the close control from completed workouts and let trainers rename athlete profiles.
 Preview test preset: 4 intervals; rest 20 seconds.
 Browser acceptance: owner.

@@ -18,7 +18,7 @@ function fixture(state,soundEnabled=false){
     localStorage:{setItem(){if(storageFailure)throw Error('Storage unavailable');}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
-  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,confirmations,setConfirm(result,wait=0){confirmResult=result;confirmWait=wait;},chooseAnimation(value){handlers.change({target:{name:'launch-animation',value}});},failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
+  return {api,app,submit(form){handlers.submit({target:form,preventDefault(){}});},spoken,utterances,speechSynthesis,bodyClasses,confirmations,setConfirm(result,wait=0){confirmResult=result;confirmWait=wait;},chooseAnimation(value){handlers.change({target:{name:'launch-animation',value}});},failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
@@ -310,9 +310,9 @@ test('coach cross ends whole running session',async()=>{
   assert.equal(f.api.screen(),'trainer');assert.equal(M.currentChild(f.api.state()),null);
   assert.equal(f.api.state().attempts[0].elapsedMs,800);
 });
-test('cross is last header control throughout training and absent from home',()=>{
+test('cross is last header control during training and absent from home',()=>{
   const {state,result}=finish(),f=fixture(state);f.api.afterFinished(result,false,null);
-  for(const screen of ['athlete-ready','result','rest','final','child-final']){
+  for(const screen of ['athlete-ready','result','rest']){
     f.api.setScreen(screen);f.api.render();const html=f.app.innerHTML;
     assert.match(html,/<header[\s\S]*data-act="toggle-sound"[\s\S]*data-act="settings"[\s\S]*data-act="end-training"[\s\S]*<\/header>/);
   }
@@ -378,4 +378,54 @@ test('automatic animation changes after local midnight without replacing measure
   f.app.querySelector=selector=>selector==='[data-launch-animation]'?glyph:null;
   const before=f.app.innerHTML;f.advance(24*60*60*1000);f.api.tick();
   assert.equal(glyph.className,'counter counter-ready launch-glow');assert.equal(f.app.innerHTML,before);
+});
+
+
+for(const child of [false,true])test(`completed workout has no close control in ${child?'coach':'athlete'} mode`,()=>{
+  const {state,result}=finish({child}),f=fixture(state);
+  f.api.afterFinished(result,false,null);
+  assert.match(f.app.innerHTML,/data-act="end-training"/);
+  f.advance(10000);
+  f.api.resultProgress();
+  assert.equal(f.api.screen(),child?'child-final':'final');
+  assert.match(f.app.innerHTML,/Тренировка завершена/);
+  assert.doesNotMatch(f.app.innerHTML,/data-act="end-training"/);
+  assert.match(f.app.innerHTML,child?/data-act="history-child"/:/data-act="final-home"/);
+});
+
+test('coach edits or cancels an athlete name without changing profile identity or history',async()=>{
+  const {state,result}=finish({child:true}),profile=state.athletes[0];
+  const f=fixture(state);
+  f.api.setScreen('trainer');
+  f.api.state().device.lastInterface='trainer';
+  f.api.unlock();
+  f.api.render();
+  assert.match(f.app.innerHTML,/Переименовать/);
+  assert.match(f.app.innerHTML,/name="athlete-name" value="Спортсмен"/);
+  const field={value:'',focus(){},select(){}};
+  const name={textContent:profile.name},option={value:profile.id,textContent:profile.name};
+  const toggle={closest:()=>row,focus(){},setAttribute(){}};
+  const form={hidden:true,dataset:{athleteId:profile.id},elements:{'athlete-name':field},matches:()=>true,closest:()=>row};
+  const row={querySelector(selector){return {'.athlete-rename':form,'[data-athlete-name]':name,'[data-act="rename-athlete"]':toggle}[selector];}};
+  f.app.querySelectorAll=()=>[option];
+
+  await f.api.handleAction('rename-athlete',toggle);
+  assert.equal(field.value,profile.name);
+  field.value='Черновик';
+  await f.api.handleAction('cancel-athlete-rename',toggle);
+  assert.equal(form.hidden,true);
+  assert.equal(f.api.state().athletes[0].name,profile.name);
+  await f.api.handleAction('rename-athlete',toggle);
+  assert.equal(field.value,profile.name);
+  field.value='  Новое <имя>  ';
+  f.submit(form);
+  assert.equal(form.hidden,true);
+  assert.equal(name.textContent,'Новое <имя>');
+  assert.equal(option.textContent,name.textContent);
+  assert.equal(f.api.state().athletes[0].id,profile.id);
+  assert.deepEqual(f.api.state().attempts,state.attempts);
+  assert.equal(f.api.state().workouts[0].athleteId,result.workout.athleteId);
+  f.api.render();
+  assert.match(f.app.innerHTML,/Новое &lt;имя&gt;/);
+  assert.throws(()=>M.renameAthlete(f.api.state(),profile.id,'  '),/Имя: от 1 до 50 символов/);
 });
