@@ -2,13 +2,15 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 const M=require('../model.js'),config=require('../config.json');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 function fixture(state,soundEnabled=false){
-  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0,storageFailure=false;
+  let clock=state.attempts.at(-1)?.endedAt?Date.parse(state.attempts.at(-1).endedAt):Date.now(),delayedResult,api,cancels=0,resumes=0,storageFailure=false,confirmResult=true,confirmWait=0;
   const spoken=[],utterances=[],bodyClasses=new Set();
   class TestDate extends Date {constructor(...args){super(...(args.length?args:[clock]));}static now(){return clock;}}
-  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener(){}};
+  const handlers={};
+  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener(name,handler){handlers[name]=handler;}};
   const speechSynthesis={paused:false,cancel(){cancels++;},resume(){resumes++;this.paused=false;},speak(u){spoken.push(u.text);utterances.push(u);}};
   function SpeechSynthesisUtterance(text){this.text=text;}
-  const window={ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
+  const confirmations=[];
+  const window={confirm(text){confirmations.push(text);clock+=confirmWait;return confirmResult;},ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
   const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},state:()=>db,afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
@@ -16,7 +18,7 @@ function fixture(state,soundEnabled=false){
     localStorage:{setItem(){if(storageFailure)throw Error('Storage unavailable');}},setTimeout(fn,ms){if(ms===200)delayedResult=fn;},clearTimeout(){},
   });
   api=window.testAPI;api.load(state);
-  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
+  return {api,app,spoken,utterances,speechSynthesis,bodyClasses,confirmations,setConfirm(result,wait=0){confirmResult=result;confirmWait=wait;},chooseAnimation(value){handlers.change({target:{name:'launch-animation',value}});},failStorage(){storageFailure=true;},advance(ms){clock+=ms;},show(){delayedResult();},clock:()=>clock,cancels:()=>cancels,resumes:()=>resumes};
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
@@ -324,4 +326,47 @@ test('storage failure cannot falsely cancel or close the running workout',async(
     assert.equal(f.api.state().attempts[0].status,'running');
     assert.equal(f.api.screen(),'athlete-ready');
   }
+});
+
+test('animation settings follow training and show three live radio samples',()=>{
+  const f=readyFixture();f.api.setScreen('settings');f.api.render();const html=f.app.innerHTML;
+  assert.ok(html.indexOf('<h2>Тренировка</h2>')<html.indexOf('Анимация запуска'));
+  for(const name of ['Сияние','Пульсация','Без анимации'])assert.ok(html.includes(name));
+  assert.equal((html.match(/name="launch-animation"/g)||[]).length,3);
+  assert.equal((html.match(/class="animation-sample"/g)||[]).length,3);
+  assert.match(html,/value="pulse" checked/);
+});
+for(const value of ['glow','pulse','none'])test(`animation selection ${value} applies in both measurement modes and on coach device`,()=>{
+  for(const child of [false,true])for(const mode of ['intervals','stopwatch']){
+    const f=readyFixture(mode,{child});f.api.setScreen('settings');f.chooseAnimation(value);
+    assert.equal(f.api.state().device.launchAnimation,value);
+    f.api.render();assert.ok(f.app.innerHTML.includes(`value="${value}" checked`));
+    f.api.setScreen(child?'child-ready':'athlete-ready');f.api.render();
+    assert.ok(f.app.innerHTML.includes(`counter counter-ready launch-${value}`));
+  }
+});
+test('confirm rejection preserves running attempt and waiting time stays in result',async()=>{
+  const f=readyFixture('stopwatch');f.api.tap();f.advance(700);f.setConfirm(false,5000);
+  await f.api.handleAction('end-training');
+  assert.equal(f.confirmations.length,1);assert.match(f.confirmations[0],/Текущая попытка будет прервана/);
+  assert.equal(f.api.state().attempts[0].status,'running');f.advance(800);f.api.tap();
+  assert.equal(f.api.state().attempts[0].totalMs,6500);
+});
+test('confirm acceptance captures interruption after response, including within first 10 seconds',async()=>{
+  const f=readyFixture('intervals');f.api.tap();f.advance(800);f.api.tap();f.setConfirm(true,3000);
+  await f.api.handleAction('end-training');
+  assert.equal(f.confirmations.length,1);assert.equal(f.api.state().attempts[0].elapsedMs,3800);
+  assert.deepEqual(f.api.state().attempts[0].intervalsMs,[800]);
+  assert.equal(f.api.state().attempts[0].interruptionReason,'early_end');
+});
+test('launch cancellation and closing an unstarted training do not ask for confirmation',async()=>{
+  const f=readyFixture();await f.api.handleAction('end-training');assert.equal(f.confirmations.length,0);
+  f.api.setScreen('athlete-ready');f.api.tap();f.advance(800);await f.api.handleAction('cancel-launch');
+  assert.equal(f.confirmations.length,0);
+});
+test('coach force-close during measurement asks once',async()=>{
+  const f=readyFixture('stopwatch',{child:true});f.api.tap();
+  f.api.unlock();f.api.state().device.lastInterface='trainer';f.api.setScreen('trainer');
+  await f.api.handleAction('force-child');assert.equal(f.confirmations.length,1);
+  assert.equal(M.currentChild(f.api.state()),null);
 });

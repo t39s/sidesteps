@@ -164,3 +164,11 @@ test('only a workout with two completed attempts gets a best-attempt mark', asyn
   assert.equal((page.html().match(/aria-label="Лучшая попытка"/g) ?? []).length, 1);
   assert.match(page.html(), /0,500 с <span aria-label="Личный рекорд">★/);
 });
+
+test('launch animation preference survives page reload and applies to the start triangle',async()=>{
+  for(const value of ['glow','pulse','none']){
+    const s=M.blank();s.device.launchAnimation=value;const storage=storeState(s);
+    const page=await openPage(storage);assert.equal(page.state().device.launchAnimation,value);
+    page.click('open-exercise');assert.ok(page.html().includes(`counter counter-ready launch-${value}`));
+  }
+});
