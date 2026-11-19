@@ -6,7 +6,7 @@ import os
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 PIN='246810'
-CONFIG={'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'recordDisplaySec':10,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
+CONFIG={'attemptCancelWindowSec':10,'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'recordDisplaySec':10,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
 
 def make_page(browser, data=None, pin=True, config_overrides=None, viewport_width=430, mobile=False):
     page=browser.new_page(viewport={'width':viewport_width,'height':900}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile)
@@ -25,7 +25,11 @@ def make_page(browser, data=None, pin=True, config_overrides=None, viewport_widt
     page.add_script_tag(content=(ROOT/'model.js').read_text())
     page.add_script_tag(content=(ROOT/'migration.js').read_text())
     page.add_script_tag(content=(ROOT/'app.js').read_text())
-    page.get_by_role('tab',name='История').wait_for(timeout=5000) if not data else page.wait_for_timeout(350)
+    try:
+        page.get_by_role('tab',name='История').wait_for(timeout=5000) if not data else page.wait_for_timeout(350)
+    except Exception:
+        print('BOOT ERRORS',errors,'BODY',page.locator('body').inner_text(),flush=True)
+        raise
     return page,errors
 
 def tap(page):
