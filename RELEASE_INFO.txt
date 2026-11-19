@@ -1,9 +1,7 @@
-sidesteps v0.2.11-rc.7
+sidesteps v0.2.11
 Release date: 2026-11-19
-Status: PREVIEW — awaiting owner acceptance
-Base candidate: 1e8fb49c1aaef6c41b5b7283fad07a22a3207f70
-Stable base: v0.2.10
-Branch: develop
-Changes: show the athlete name above the action buttons in the coach roster.
-Preview test preset: 4 intervals; rest 20 seconds.
-Browser acceptance: owner.
+Status: STABLE
+Accepted candidate: v0.2.11-rc.7 (363ac518a5492c09f88d577f718ad0cddd4d60cb)
+Previous stable: v0.2.10
+Branch: main
+Production preset: 20 intervals; rest 120 seconds.
