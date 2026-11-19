@@ -34,17 +34,30 @@
   function validate(s){
     assert(s?.schemaVersion===6,'Несовместимая версия данных');
     validateV5({...s,schemaVersion:5});
-    const ids=new Set(s.athletes.map(a=>a.id)), wm=new Map(s.workouts.map(w=>[w.id,w]));
+    const ids=new Set(s.athletes.map(a=>a.id)), wm=new Map(s.workouts.map(w=>[w.id,w])), am=new Map(s.attempts.map(a=>[a.id,a]));
     assert(ids.has(s.baseProfileId),'Не назначен базовый профиль');
     assert(s.incomplete.every(a=>ids.has(a.athleteId)),'Неполная попытка без профиля');
     for(const k of ['selectedAthleteId','trainerAthleteId','viewAthleteId'])assert(s.device[k]==null||ids.has(s.device[k]),'Некорректный указатель профиля');
     assert(Array.isArray(s.device.childParticipants)&&s.device.childParticipants.every(id=>ids.has(id)),'Некорректные участники');
     assert(!s.device.activeWorkoutId||wm.has(s.device.activeWorkoutId),'Нет активной тренировки');
     assert(!s.device.activeChildSessionId||s.childSessions.some(c=>c.id===s.device.activeChildSessionId&&c.status==='active'),'Нет активного занятия');
-    for(const w of s.workouts)assert(new Set(w.attemptIds).size===w.attemptIds.length,'Повтор попытки');
+    const timestamp=x=>typeof x==='string'&&Number.isFinite(Date.parse(x));
+    for(const a of s.attempts){
+      assert(timestamp(a.startedAt)&&(a.endedAt==null||timestamp(a.endedAt)),'Некорректная дата попытки');
+      assert(Number.isInteger(a.ordinal)&&a.ordinal>=1&&a.ordinal<=wm.get(a.workoutId).plannedAttempts,'Некорректный номер попытки');
+      assert(Array.isArray(a.intervalsMs)&&a.intervalsMs.every(x=>Number.isSafeInteger(x)&&x>=0),'Некорректные отсечки');
+      assert(a.mode==='stopwatch'?a.intervalsMs.length===0:Number.isInteger(a.targetIntervals)&&a.targetIntervals>=1&&a.targetIntervals<=200,'Некорректный режим попытки');
+    }
+    for(const w of s.workouts){
+      assert(new Set(w.attemptIds).size===w.attemptIds.length,'Повтор попытки');
+      assert(timestamp(w.createdAt)&&['solo','child','legacy'].includes(w.kind),'Некорректная тренировка');
+      const done=w.attemptIds.map(id=>am.get(id)).filter(a=>a.status==='completed');
+      assert(done.length<=w.plannedAttempts&&new Set(done.map(a=>a.ordinal)).size===done.length,'Некорректное число зачётных попыток');
+    }
     for(const c of s.childSessions){
       assert(Array.isArray(c.workoutIds)&&c.workoutIds.length===c.athleteIds.length&&new Set(c.workoutIds).size===c.workoutIds.length,'Некорректные тренировки занятия');
       assert(c.workoutIds.every((id,i)=>wm.get(id)?.athleteId===c.athleteIds[i]),'Нарушена связь занятия');
+      assert(c.sequence.length===c.athleteIds.length*c.plannedAttempts&&c.sequence.every((t,i)=>t.athleteId===c.athleteIds[i%c.athleteIds.length]&&t.ordinal===Math.floor(i/c.athleteIds.length)+1),'Нарушен порядок занятия');
       assert(c.sequence.every(t=>c.workoutIds.includes(t.workoutId)&&wm.get(t.workoutId)?.athleteId===t.athleteId&&Number.isInteger(t.ordinal)&&t.ordinal>=1&&t.ordinal<=c.plannedAttempts),'Некорректная очередь');
     }
     return s;
