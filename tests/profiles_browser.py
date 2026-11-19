@@ -48,7 +48,9 @@ def test_profiles(browser):
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][1]['athleteId']==state(p)['baseProfileId']
     trainer(p)
-    p.on('dialog',lambda d:d.accept())
+    def approve(d):
+        d.accept('1') if d.type=='prompt' else d.accept()
+    p.on('dialog',approve)
     p.locator(f'[data-act="set-base"][data-id="{aid}"]').click()
     assert state(p)['baseProfileId']==aid
     before=state(p)['attempts']
@@ -57,6 +59,17 @@ def test_profiles(browser):
     form.locator('input').fill('Новое имя');form.get_by_role('button',name='Сохранить').click()
     assert state(p)['athletes'][1]['id']==aid
     assert state(p)['attempts']==before
+    p.remove_listener('dialog',approve)
+    p.once('dialog',lambda d:d.dismiss())
+    snapshot=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
+    p.locator(f'[data-act="delete-athlete"][data-id="{aid}"]').click()
+    assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==snapshot
+    p.on('dialog',approve)
+    p.locator(f'[data-act="delete-athlete"][data-id="{aid}"]').click()
+    assert len(state(p)['athletes'])==1
+    assert state(p)['baseProfileId']!=aid
+    assert state(p)['attempts']==[a for a in before if a['athleteId']!=aid]
+    assert p.locator('[data-act="delete-athlete"]').count()==0
     assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
     assert not errors,errors
     p.close()

@@ -35,9 +35,9 @@ jobs:
         env:
           CHROMIUM_EXECUTABLE: ''
         run: |
+          python tests/profiles_browser.py
           python tests/browser_smoke.py
           python tests/mobile_regression.py
-          python tests/profiles_browser.py
       - name: Package verified candidate
         run: |
           git archive --format=zip --output=sidesteps_candidate.zip HEAD

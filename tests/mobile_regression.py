@@ -75,7 +75,7 @@ def test_history_chart_portrait(browser):
     p,errs=make_page(browser,pin=False)
     data=p.evaluate('''() => {
       const M=window.ILModel;let s=M.blank();
-      for(let i=0;i<7;i++){
+      for(let i=0;i<105;i++){
         const w=M.startSolo(s,'athlete-default',1);s=w.state;
         const when=new Date(Date.UTC(2026,9,1+i)).toISOString();
         const a=M.startAttempt(s,w.value.id,'stopwatch',1,when);s=a.state;
