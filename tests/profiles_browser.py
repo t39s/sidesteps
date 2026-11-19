@@ -52,7 +52,7 @@ def test_profiles(browser):
     p.locator(f'[data-act="set-base"][data-id="{aid}"]').click()
     assert state(p)['baseProfileId']==aid
     before=state(p)['attempts']
-    p.locator(f'[data-athlete-id="{aid}"]').first.locator('[data-act="rename-athlete"]').click()
+    p.locator('.athlete-row').filter(has=p.locator(f'form[data-athlete-id="{aid}"]')).locator('[data-act="rename-athlete"]').click()
     form=p.locator(f'form[data-athlete-id="{aid}"]')
     form.locator('input').fill('Новое имя');form.get_by_role('button',name='Сохранить').click()
     assert state(p)['athletes'][1]['id']==aid
