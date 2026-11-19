@@ -56,9 +56,11 @@
     }
     for(const c of s.childSessions){
       assert(Array.isArray(c.workoutIds)&&c.workoutIds.length===c.athleteIds.length&&new Set(c.workoutIds).size===c.workoutIds.length,'Некорректные тренировки занятия');
-      assert(c.workoutIds.every((id,i)=>wm.get(id)?.athleteId===c.athleteIds[i]),'Нарушена связь занятия');
+      const unavailable=c.unavailableWorkoutIds??[];
+      assert(Array.isArray(unavailable)&&new Set(unavailable).size===unavailable.length&&unavailable.every(id=>typeof id==='string'&&c.workoutIds.includes(id)&&!wm.has(id))&&(c.status!=='active'||!unavailable.length),'Некорректные отсутствующие тренировки занятия');
+      assert(c.workoutIds.every((id,i)=>wm.has(id)?wm.get(id).athleteId===c.athleteIds[i]:unavailable.includes(id)),'Нарушена связь занятия');
       assert(c.sequence.length===c.athleteIds.length*c.plannedAttempts&&c.sequence.every((t,i)=>t.athleteId===c.athleteIds[i%c.athleteIds.length]&&t.ordinal===Math.floor(i/c.athleteIds.length)+1),'Нарушен порядок занятия');
-      assert(c.sequence.every(t=>c.workoutIds.includes(t.workoutId)&&wm.get(t.workoutId)?.athleteId===t.athleteId&&Number.isInteger(t.ordinal)&&t.ordinal>=1&&t.ordinal<=c.plannedAttempts),'Некорректная очередь');
+      assert(c.sequence.every(t=>c.workoutIds.includes(t.workoutId)&&(wm.has(t.workoutId)?wm.get(t.workoutId).athleteId===t.athleteId:unavailable.includes(t.workoutId)&&c.athleteIds[c.workoutIds.indexOf(t.workoutId)]===t.athleteId)&&Number.isInteger(t.ordinal)&&t.ordinal>=1&&t.ordinal<=c.plannedAttempts),'Некорректная очередь');
     }
     return s;
   }
@@ -67,6 +69,13 @@
     const n=clone(source);n.schemaVersion=6;
     n.baseProfileId=source.athletes.length===1?source.athletes[0].id:selectedBaseId;
     n.device.trainerActivated=false;n.device.selectedAthleteId=n.baseProfileId;
+    // v5 deletion removed results but retained closed session snapshots. Keep those facts,
+    // marking unavailable historical workouts without fabricating results or changing v5.
+    const existing=new Set(n.workouts.map(w=>w.id));
+    for(const c of n.childSessions)if(c.status!=='active'&&Array.isArray(c.workoutIds)){
+      const unavailable=c.workoutIds.filter(id=>!existing.has(id));
+      if(unavailable.length)c.unavailableWorkoutIds=unavailable;
+    }
     return validate(n);
   }
   const safeCurrentProfile=(s,authorized=false)=>authorized&&s.athletes.some(a=>a.id===s.device.trainerAthleteId)?s.device.trainerAthleteId:s.baseProfileId;
@@ -170,6 +179,7 @@
       const valid=c.workoutIds.filter(id=>n.workouts.some(w=>w.id===id));
       const removed=c.sequence.slice(0,c.nextIndex).filter(t=>!valid.includes(t.workoutId)).length;
       c.sequence=c.sequence.filter(t=>valid.includes(t.workoutId));c.nextIndex-=removed;
+      delete c.unavailableWorkoutIds;
       c.workoutIds=valid;c.athleteIds=valid.map(id=>workoutOf(n,id).athleteId);return valid.length;
     });
   }
@@ -186,7 +196,9 @@
     for(const k of ['workouts','attempts','archived','incomplete'])n[k]=n[k].filter(x=>x.athleteId!==aid);
     // Retain other participants' results and project the historical session onto them.
     n.childSessions=n.childSessions.filter(c=>{const removed=c.sequence.slice(0,c.nextIndex).filter(t=>t.athleteId===aid).length;
-      c.athleteIds=c.athleteIds.filter(id=>id!==aid);c.workoutIds=c.workoutIds.filter(id=>n.workouts.some(w=>w.id===id));
+      c.workoutIds=c.workoutIds.filter((id,i)=>c.athleteIds[i]!==aid);
+      if(c.unavailableWorkoutIds){c.unavailableWorkoutIds=c.unavailableWorkoutIds.filter(id=>c.workoutIds.includes(id));if(!c.unavailableWorkoutIds.length)delete c.unavailableWorkoutIds;}
+      c.athleteIds=c.athleteIds.filter(id=>id!==aid);
       c.sequence=c.sequence.filter(t=>t.athleteId!==aid);c.nextIndex-=removed;return c.athleteIds.length;});
     n.device.childParticipants=n.device.childParticipants.filter(id=>id!==aid);
     for(const k of ['selectedAthleteId','trainerAthleteId','viewAthleteId'])if(n.device[k]===aid)n.device[k]=n.baseProfileId;

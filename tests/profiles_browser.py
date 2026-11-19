@@ -31,6 +31,34 @@ def test_migration(browser):
     assert q.get_by_role('heading',name='Вход Тренера').is_visible()
     assert not errors+e,errors+e
     q.close()
+def test_deleted_session_migration(browser):
+    original=json.loads((ROOT/'tests/fixtures/v5-deleted-session-workout.json').read_text())
+    for all_deleted in (False,True):
+        old=json.loads(json.dumps(original))
+        if all_deleted:old['workouts']=[];old['attempts']=[]
+        raw=json.dumps(old)
+        p,errors=make_page(browser,{OLD:raw})
+        assert p.evaluate('(key)=>localStorage.getItem(key)',KEY) is None
+        p.locator('#pin-input').fill(PIN);p.get_by_role('button',name='Войти',exact=True).click()
+        p.locator('#base-choice').select_option(old['athletes'][1]['id'])
+        p.get_by_role('button',name='Назначить базовым').click()
+        p.wait_for_function('(key)=>localStorage.getItem(key)!==null',arg=KEY)
+        s=state(p)
+        assert s['baseProfileId']==old['athletes'][1]['id']
+        for field in ('athletes','workouts','attempts','archived','incomplete'):assert s[field]==old[field],field
+        session=dict(s['childSessions'][0]);missing=session.pop('unavailableWorkoutIds')
+        assert session==old['childSessions'][0]
+        assert len(missing)==(2 if all_deleted else 1)
+        assert p.evaluate('(key)=>localStorage.getItem(key)',OLD)==raw
+        assert 'Нарушена связь занятия' not in p.locator('body').inner_text()
+        for profile in old['athletes']:
+            p.locator(f'[data-act="child-view"][data-id="{profile["id"]}"]').click()
+            assert p.get_by_role('tabpanel').is_visible()
+        data=p.evaluate('window.__dump()');p.close()
+        q,e=make_page(browser,data)
+        assert state(q)['attempts']==old['attempts']
+        assert not errors+e,errors+e
+        q.close()
 def test_profiles(browser):
     p,errors=make_page(browser,viewport_width=320,mobile=True)
     trainer(p)
@@ -99,6 +127,6 @@ def test_http_pwa(browser):
 if __name__=='__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
-        for check in [test_migration,test_profiles,test_http_pwa]:
+        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa]:
             check(b);print('PASS',check.__name__,flush=True)
         b.close()

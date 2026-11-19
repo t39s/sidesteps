@@ -1,4 +1,4 @@
-# sidesteps v0.3.0-rc.2 — кандидат для пользовательской проверки
+# sidesteps v0.3.0-rc.3 — кандидат для пользовательской проверки
 
 Разработка в `develop`, стабильная v0.2.11 остаётся в `main`.
 Preview: https://t39s.github.io/sidesteps/preview/

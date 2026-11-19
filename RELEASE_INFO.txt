@@ -1,4 +1,4 @@
-sidesteps v0.3.0-rc.2
+sidesteps v0.3.0-rc.3
 Release date: 2026-11-19
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
