@@ -3,7 +3,7 @@ const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 async function page(initial={},options={}){
  const data=new Map(Object.entries(initial)),nodes={},events={},messages=[];let failWrite=false;
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
- const store={getItem:k=>data.get(k)??null,setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
+ const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
  const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>true,prompt:()=>null};
  const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
@@ -25,3 +25,6 @@ test('exports never grant privileges; personal export only base, trainer export 
 test('stale storage blocks commit and revokes trainer on storage event',async()=>{const p=await page();p.api.unlock();p.data.set(M.KEY,'changed');assert.throws(()=>p.api.operate(s=>M.renameAthlete(s,s.baseProfileId,'X')),/другой вкладке/);assert.equal(p.data.get(M.KEY),'changed');p.events.storage({key:M.KEY});assert.equal(p.api.authorized(),false);});
 
 test('leaving coach solo session blocks its continuation until PIN, preserving recovery',async()=>{let s=M.migrateV5ToV6(v5,v5.athletes[0].id),aid=v5.athletes[1].id;s=M.startSolo(s,aid,2,true).state;s.device.trainerAthleteId=aid;s.device.lastInterface='athlete';const p=await page({[M.KEY]:JSON.stringify(s)});assert.equal(p.api.screen(),'pin');await p.api.handleAction('pin-back');await p.api.handleAction('open-exercise');assert.equal(p.api.screen(),'pin');assert.equal(p.api.state().device.activeWorkoutId,s.device.activeWorkoutId);});
+
+test('startup cannot overwrite a newer snapshot observed after parsing its input',async()=>{const original=M.blank(),newer=JSON.stringify(M.renameAthlete(original,original.baseProfileId,'Другая вкладка').state);let reads=0;const p=await page({[M.KEY]:JSON.stringify(original)},{onRead(k,data){if(k===M.KEY&&++reads===2)data.set(k,newer);}});assert.equal(p.data.get(M.KEY),newer);assert.match(p.html(),/Не удалось открыть историю/);});
+test('single migration cannot overwrite v6 concurrently created by another tab',async()=>{const source=JSON.stringify(require('./fixtures/v5-single.json')),newer=JSON.stringify(M.renameAthlete(M.blank(),'athlete-default','Другая вкладка').state);let reads=0;const p=await page({[M.V5_KEY]:source},{onRead(k,data){if(k===M.V5_KEY&&++reads===2)data.set(M.KEY,newer);}});assert.equal(p.data.get(M.KEY),newer);assert.equal(p.data.get(M.V5_KEY),source);assert.match(p.html(),/Не удалось открыть историю/);});
