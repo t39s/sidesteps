@@ -222,3 +222,29 @@ test('athlete administrator login gear is disabled and settings work again after
   assert.doesNotMatch(f.app.innerHTML,/aria-label="Настройки" disabled/);
   await f.api.handleAction('settings',{});assert.equal(f.api.screen(),'settings');
 });
+
+for(const destination of ['settings','pin'])for(const record of [false,true])for(const sound of [false,true]){
+  test(`result deadline recovers after early ${destination} navigation (${record?'record':'ordinary'}, ${sound?'sound':'silent'})`,async()=>{
+    const {state,result}=finish({record});const f=fixture(state,sound);
+    f.api.afterFinished(result,true,null);
+    await f.api.handleAction(destination,{});
+    f.advance(200);f.show();
+    assert.equal(f.api.until(),null);
+    f.advance(1000);
+    await f.api.handleAction(destination+'-back',{});
+    assert.equal(f.api.screen(),'result');
+    const duration=(record?config.recordDisplaySec:config.resultDisplaySec)*1000;
+    assert.equal(f.api.until(),f.clock()+duration);
+    f.advance(duration-1);f.api.tick();assert.equal(f.api.screen(),'result');
+    f.advance(1);f.api.tick();assert.equal(f.api.screen(),'final');
+  });
+}
+test('a delayed render does not restart an already displayed result deadline',async()=>{
+  const {state,result}=finish();const f=fixture(state);
+  f.api.afterFinished(result,true,null);
+  await f.api.handleAction('settings',{});
+  await f.api.handleAction('settings-back',{});
+  const deadline=f.api.until();assert.notEqual(deadline,null);
+  f.advance(200);f.show();assert.equal(f.api.until(),deadline);
+  f.api.render();assert.equal(f.api.until(),deadline);
+});
