@@ -370,3 +370,12 @@ test('coach force-close during measurement asks once',async()=>{
   await f.api.handleAction('force-child');assert.equal(f.confirmations.length,1);
   assert.equal(M.currentChild(f.api.state()),null);
 });
+
+test('automatic animation changes after local midnight without replacing measurement surface',()=>{
+  const f=readyFixture(),day=new Date(f.clock());
+  f.api.state().device.launchAnimationFirstDay=`${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
+  const glyph={className:'counter counter-ready launch-pulse'};
+  f.app.querySelector=selector=>selector==='[data-launch-animation]'?glyph:null;
+  const before=f.app.innerHTML;f.advance(24*60*60*1000);f.api.tick();
+  assert.equal(glyph.className,'counter counter-ready launch-glow');assert.equal(f.app.innerHTML,before);
+});

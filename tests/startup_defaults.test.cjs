@@ -8,8 +8,14 @@ const M = require('../model.js');
 const source = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
 const config = require('../config.json');
 
-async function openPage(storage) {
+async function openPage(storage, wallTime = null) {
   const events = {};
+  let onTick;
+  class PageDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [wallTime ?? Date.now()])); }
+    static now() { return wallTime ?? Date.now(); }
+  }
+
   const app = {
     innerHTML: '',
     querySelector: () => null,
@@ -25,19 +31,21 @@ async function openPage(storage) {
       setItem: (key, value) => storage.set(key, value),
     },
     fetch: async () => ({ ok: true, json: async () => config }),
-    navigator: {},
+    navigator: {}, Date: PageDate,
     performance: { now: () => time },
-    setInterval() {}, setTimeout() {}, clearTimeout() {}, console,
+    setInterval(fn) { onTick = fn; }, setTimeout() {}, clearTimeout() {}, console,
   });
   await new Promise(resolve => setImmediate(resolve));
   return {
     html: () => app.innerHTML,
+    setDate(value) { wallTime = Date.parse(value); },
+    tick() { onTick(); },
     state: () => JSON.parse(storage.get(M.KEY)),
     click(act) {
       const button = { dataset: { act }, matches: () => false, setAttribute() {} };
       events.click({ target: { closest: () => button } });
     },
-    change(id, value) { events.change({ target: { id, value } }); },
+    change(id, value) { events.change({ target: { id, name: id, value } }); },
     tap() {
       time += config.minTapGapMs + 100;
       events.pointerdown({ target: { closest: () => true }, button: 0, preventDefault() {} });
@@ -171,4 +179,32 @@ test('launch animation preference survives page reload and applies to the start 
     const page=await openPage(storage);assert.equal(page.state().device.launchAnimation,value);
     page.click('open-exercise');assert.ok(page.html().includes(`counter counter-ready launch-${value}`));
   }
+});
+
+for(const child of [false,true])test(`${child?'coach device':'personal device'}: first local day pulses, following days glow`,async()=>{
+  let s=M.blank();if(child)s=M.startChild(s,['athlete-default'],2).state;
+  const storage=storeState(s);
+  const first=await openPage(storage,Date.parse('2026-11-19T08:00:00'));
+  assert.equal(first.state().device.launchAnimationFirstDay,'2026-11-19');
+  if(!child)first.click('open-exercise');
+  assert.ok(first.html().includes('counter counter-ready launch-pulse'));
+  for(const [date,expected] of [['2026-11-19T23:59:59','pulse'],['2026-11-20T00:00:00','glow'],['2026-11-25T12:00:00','glow']]){
+    const page=await openPage(storage,Date.parse(date));if(!child)page.click('open-exercise');
+    assert.ok(page.html().includes(`counter counter-ready launch-${expected}`));
+    assert.equal(page.state().device.launchAnimationFirstDay,'2026-11-19');
+    assert.equal(page.state().device.launchAnimation,undefined);
+  }
+});
+for(const chosen of ['pulse','glow','none'])test(`manual ${chosen} overrides automatic rule immediately and after reload`,async()=>{
+  const storage=storeState(M.blank()),page=await openPage(storage,Date.parse('2026-11-19T08:00:00'));
+  page.click('settings');page.change('launch-animation',chosen);page.click('settings-back');page.click('open-exercise');
+  assert.ok(page.html().includes(`counter counter-ready launch-${chosen}`));
+  const later=await openPage(storage,Date.parse('2026-12-21T08:00:00'));later.click('open-exercise');
+  assert.ok(later.html().includes(`counter counter-ready launch-${chosen}`));
+});
+test('automatic animation uses calendar day across year boundary, not 24 elapsed hours',async()=>{
+  const storage=storeState(M.blank()),page=await openPage(storage,Date.parse('2026-12-31T23:59:00'));
+  assert.equal(page.state().device.launchAnimationFirstDay,'2026-12-31');
+  const next=await openPage(storage,Date.parse('2027-01-01T00:01:00'));next.click('open-exercise');
+  assert.ok(next.html().includes('counter counter-ready launch-glow'));
 });
