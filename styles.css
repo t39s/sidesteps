@@ -128,3 +128,6 @@ body.trainer-theme{background:#321B27}
 .athlete-row-controls > span{overflow-wrap:anywhere}
 .athlete-row-actions{display:flex;flex-wrap:wrap;gap:.4rem}
 .athlete-rename{padding-bottom:.75rem}
+
+.workout-comments textarea{display:block;width:100%;font:inherit;font-size:16px;background:#0d2135;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:5px;resize:vertical}
+.comment-text{white-space:pre-wrap;overflow-wrap:anywhere}

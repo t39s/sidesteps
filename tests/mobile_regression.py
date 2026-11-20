@@ -51,7 +51,7 @@ def test_child_single_reload_and_early(browser):
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать занятие').click()
     assert p.locator('.child .app-head .mode-tag').count()==0
-    assert p.get_by_role('link',name='Войти').is_visible()
+    assert p.get_by_role('link',name='К управлению занятием').is_visible()
     tap(p);tap(p)
     p.get_by_role('button',name='Начать раньше').wait_for(timeout=5000)
     data=p.evaluate('window.__dump()');p.close()
@@ -146,7 +146,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.3.0-rc.4 · Войти'
+        assert footer.inner_text()=='sidesteps v. 0.3.0-rc.5 · Войти'
         assert login.get_attribute('title')=='Для Тренера'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"

@@ -31,6 +31,7 @@
     assert(Number.isSafeInteger(s.revision) && s.revision>=0,'Некорректная ревизия');
     return s;
   }
+  const workoutCommentFields=['athleteComment','trainerComment'];
   function validate(s){
     assert(s?.schemaVersion===6,'Несовместимая версия данных');
     validateV5({...s,schemaVersion:5});
@@ -49,6 +50,7 @@
       assert(a.mode==='stopwatch'?a.intervalsMs.length===0:Number.isInteger(a.targetIntervals)&&a.targetIntervals>=1&&a.targetIntervals<=200,'Некорректный режим попытки');
     }
     for(const w of s.workouts){
+      for(const field of workoutCommentFields)assert(!Object.hasOwn(w,field)||typeof w[field]==='string','Некорректный комментарий тренировки');
       assert(new Set(w.attemptIds).size===w.attemptIds.length,'Повтор попытки');
       assert(timestamp(w.createdAt)&&['solo','child','legacy'].includes(w.kind),'Некорректная тренировка');
       const done=w.attemptIds.map(id=>am.get(id)).filter(a=>a.status==='completed');
@@ -78,7 +80,6 @@
     }
     return validate(n);
   }
-  const safeCurrentProfile=(s,authorized=false)=>authorized&&s.athletes.some(a=>a.id===s.device.trainerAthleteId)?s.device.trainerAthleteId:s.baseProfileId;
   function setBaseProfile(s,aid,authorized=false){assert(authorized,'Требуется PIN Тренера');return mutation(s,n=>{
     assert(!n.device.activeWorkoutId&&!currentChild(n),'Сначала завершите тренировку или занятие');
     assert(n.athletes.some(a=>a.id===aid),'Профиль не найден');n.baseProfileId=aid;n.device.selectedAthleteId=aid;return aid;
@@ -108,7 +109,7 @@
   }
   function newWorkout(n,athleteId,plannedAttempts,kind='solo'){assert(n.athletes.some(a=>a.id===athleteId),'Нет такого спортсмена');assert([1,2].includes(plannedAttempts),'Число попыток 1 или 2');const w={id:id(),athleteId,plannedAttempts,kind,status:'pending',createdAt:iso(),completedAt:null,closeReason:null,attemptIds:[],baselineExistsAtStart:baseline(n,athleteId)!==null,firstStartedAt:null,firstEndedAt:null};n.workouts.push(w);return w;}
   function addArchived(s,athleteId,dateString,bestMs){return mutation(s,n=>{assert(n.athletes.some(a=>a.id===athleteId),'Неизвестный спортсмен');assert(/^\d{4}-\d{2}-\d{2}$/.test(dateString)&&!Number.isNaN(Date.parse(dateString+'T00:00:00Z')),'Некорректная дата');assert(validMs(bestMs),'Некорректное время');const item={id:id(),athleteId,date:dateString,bestMs};n.archived.push(item);return item;});}
-  function startSolo(s,athleteId,plannedAttempts,authorized=false){assert(authorized||athleteId===s.baseProfileId,'Требуется PIN Тренера');return mutation(s,n=>{assert(!currentChild(n),'Сначала завершите занятие');assert(!n.device.activeWorkoutId,'Уже есть активная тренировка');const w=newWorkout(n,athleteId,plannedAttempts);n.device.activeWorkoutId=w.id;return w;});}
+  function startSolo(s,athleteId,plannedAttempts){assert(athleteId===s.baseProfileId,'Самостоятельная тренировка доступна только базовому профилю');return mutation(s,n=>{assert(!currentChild(n),'Сначала завершите занятие');assert(!n.device.activeWorkoutId,'Уже есть активная тренировка');const w=newWorkout(n,athleteId,plannedAttempts);n.device.activeWorkoutId=w.id;return w;});}
   function startChild(s,athleteIds,plannedAttempts){return mutation(s,n=>{assert(!currentChild(n),'Занятие уже началось');assert(!n.device.activeWorkoutId,'Активна личная тренировка');assert(Array.isArray(athleteIds) && [1,2].includes(athleteIds.length) && new Set(athleteIds).size===athleteIds.length,'Выберите одного или двух разных участников');const ws=athleteIds.map(athleteId=>newWorkout(n,athleteId,plannedAttempts,'child'));const sequence=[];for(let ordinal=1;ordinal<=plannedAttempts;ordinal++)for(let j=0;j<athleteIds.length;j++)sequence.push({athleteId:athleteIds[j],workoutId:ws[j].id,ordinal});const c={id:id(),athleteIds:[...athleteIds],workoutIds:ws.map(w=>w.id),plannedAttempts,sequence,nextIndex:0,status:'active',startedAt:iso(),endedAt:null,closeReason:null};n.childSessions.push(c);n.device.activeChildSessionId=c.id;n.device.childParticipants=[...athleteIds];n.device.viewAthleteId=athleteIds[0];n.device.lastInterface='child';return c;});}
   function nextTurn(s){const c=currentChild(s);return c?c.sequence[c.nextIndex]||null:null;}
   function startAttempt(s,workoutId,mode,target,when=iso(),authorized=false){const w0=workoutOf(s,workoutId);assert(currentChild(s)||authorized||w0?.athleteId===s.baseProfileId,'Требуется PIN Тренера');return mutation(s,n=>{const w=workoutOf(n,workoutId);assert(w&&['pending','legacy_pending'].includes(w.status)&&w.closeReason!=='early_end','Тренировка завершена');assert(['intervals','stopwatch'].includes(mode),'Неизвестный режим');assert(Number.isInteger(target)&&target>=1&&target<=200,'Некорректное число интервалов');const c=currentChild(n);if(c){const t=c.sequence[c.nextIndex];assert(t && t.workoutId===w.id,'Не очередь данного спортсмена');}else assert(n.device.activeWorkoutId===w.id,'Тренировка не активна');assert(!n.attempts.some(a=>a.workoutId===w.id && a.status==='running'),'Измерение уже запущено');const ordinal=completed(n,w).length+1;assert(ordinal<=w.plannedAttempts,'Попытки исчерпаны');const a={id:id(),workoutId:w.id,athleteId:w.athleteId,ordinal,mode,status:'running',startedAt:when,endedAt:null,totalMs:null,intervalsMs:[],targetIntervals:mode==='intervals'?target:null,recordEvent:false,previousRecordMs:null};n.attempts.push(a);w.attemptIds.push(a.id);if(!w.firstStartedAt)w.firstStartedAt=when;return a;});}
@@ -208,16 +209,40 @@
   function migrateV4(old){assert(old&&[1,2,3,4].includes(old.version),'Некорректный формат v1–v4');const n=blank();n.schemaVersion=5;delete n.baseProfileId;assert(Array.isArray(old.sessions)&&Number.isInteger(old.target),'Некорректный архив');if(old.version===1){n.athletes=[{id:'athlete-default',name:'Спортсмен'}];}else {assert(Array.isArray(old.athletes)&&old.athletes.length>0,'Нет спортсменов');n.athletes=old.athletes.map(a=>({id:a.id,name:a.name}));}n.device.selectedAthleteId=old.selectedAthleteId&&n.athletes.some(a=>a.id===old.selectedAthleteId)?old.selectedAthleteId:n.athletes[0].id;n.device.trainerAthleteId=n.device.selectedAthleteId;n.device.measurementMode=old.mode==='stopwatch'?'stopwatch':'intervals';
     for(const s of old.sessions){assert(s&&Array.isArray(s.exercises)&&s.exercises.length>=1&&s.exercises.length<=2,'Некорректная серия');const athleteId=old.version===1?'athlete-default':s.athleteId;assert(n.athletes.some(a=>a.id===athleteId),'Серия без спортсмена');const count=s.exercises.length,closed=old.version>=4?s.status==='closed':count===2;const wid='legacy-workout:'+s.id;const w={id:wid,athleteId,plannedAttempts:2,kind:'legacy',status:closed?'completed':'legacy_pending',createdAt:s.createdAt,completedAt:closed?s.exercises.at(-1).endedAt:null,closeReason:closed?'legacy':null,attemptIds:[],baselineExistsAtStart:false,firstStartedAt:s.exercises[0].startedAt,firstEndedAt:s.exercises[0].endedAt};for(let i=0;i<count;i++){const ex=s.exercises[i],mode=old.version>=3?ex.mode:'intervals';assert(['intervals','stopwatch'].includes(mode),'Некорректный режим');const intervals=mode==='intervals'?ex.intervals.map(x=>Math.round(x)):[];const total=mode==='intervals'?intervals.reduce((x,y)=>x+y,0):Math.round(ex.totalMs);assert(validMs(total),'Некорректный результат');const aid='legacy-attempt:'+s.id+':'+(i+1);w.attemptIds.push(aid);n.attempts.push({id:aid,athleteId,workoutId:wid,ordinal:i+1,status:'completed',mode,startedAt:ex.startedAt,endedAt:ex.endedAt,totalMs:total,intervalsMs:intervals,targetIntervals:mode==='intervals'?s.target:null,recordEvent:false,previousRecordMs:null});}n.workouts.push(w);}
     n.archived=(old.archived||[]).map(a=>({id:'legacy-archive:'+a.id,athleteId:a.athleteId,date:a.date,bestMs:a.bestMs}));n.incomplete=(old.incomplete||[]).map(a=>({...a,id:'legacy-incomplete:'+a.id}));validateV5(n);return n;}
+  function canEditWorkoutComment(s,w,field,trainer=false){
+    return w?.status==='completed'&&workoutCommentFields.includes(field)&&
+      (trainer||(field==='athleteComment'&&w.athleteId===s.baseProfileId&&['solo','legacy'].includes(w.kind)));
+  }
+  function saveWorkoutComments(s,workoutId,comments,trainer=false){
+    return mutation(s,n=>{
+      const w=workoutOf(n,workoutId);
+      for(const [field,text] of Object.entries(comments)){
+        assert(canEditWorkoutComment(n,w,field,trainer),'Нет доступа к редактированию комментария');
+        assert(typeof text==='string','Некорректный комментарий тренировки');
+        if(text.trim())w[field]=text.replace(/\r\n?/g,'\n');
+        else delete w[field];
+      }
+      return w;
+    });
+  }
+  function comparableWorkout(w){
+    const result={...w};
+    for(const field of workoutCommentFields){
+      if(!result[field]?.trim())delete result[field];
+      else result[field]=result[field].replace(/\r\n?/g,'\n');
+    }
+    return result;
+  }
   const fields=['workouts','attempts','archived','incomplete','childSessions'];
   function canonical(x){if(Array.isArray(x))return x.map(canonical);if(x&&typeof x==='object')return Object.fromEntries(Object.keys(x).sort().map(k=>[k,canonical(x[k])]));return x;}
   const equivalent=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   const sorted=xs=>[...xs].sort((a,b)=>a.id.localeCompare(b.id));
-  function profileProjection(s,aid){return {profile:s.athletes.find(a=>a.id===aid),...Object.fromEntries(fields.map(k=>[k,sorted(s[k].filter(x=>k==='childSessions'?x.athleteIds.includes(aid):x.athleteId===aid))]))};}
+  function profileProjection(s,aid){return {profile:s.athletes.find(a=>a.id===aid),...Object.fromEntries(fields.map(k=>[k,sorted(s[k].filter(x=>k==='childSessions'?x.athleteIds.includes(aid):x.athleteId===aid)).map(x=>k==='workouts'?comparableWorkout(x):x)]))};}
   function isPlaceholder(s){return s.athletes.length===1&&s.athletes[0].id==='athlete-default'&&s.athletes[0].name==='Спортсмен'&&fields.every(k=>!s[k].length)&&!s.device.activeWorkoutId&&!s.device.activeChildSessionId;}
   function normalizeImport(raw,baseId){return raw.schemaVersion===6?validate(clone(raw)):migrateV5ToV6(raw.schemaVersion===5?raw:migrateV4(raw),baseId);}
   function merge(s,imported){validate(s);validate(imported);
     for(const a of imported.athletes)if(s.athletes.some(x=>x.id===a.id))assert(equivalent(profileProjection(s,a.id),profileProjection(imported,a.id)),'Конфликт профиля или истории: '+a.name);
-    return mutation(s,n=>{for(const field of ['athletes',...fields]){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(clone(x));else assert(equivalent(old,x),'Конфликт при импорте: '+x.id);}}return true;});
+    return mutation(s,n=>{for(const field of ['athletes',...fields]){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(clone(x));else assert(field==='workouts'?equivalent(comparableWorkout(old),comparableWorkout(x)):equivalent(old,x),'Конфликт при импорте: '+x.id);}}return true;});
   }
   function evaluateImport(s,raw,authorized=false,baseId){
     validate(s);assert(!s.device.activeWorkoutId&&!currentChild(s),'Сначала завершите тренировку или занятие');
@@ -235,5 +260,5 @@
     r.state.device.trainerActivated=false;return r;
   }
   function renderChartData(s,athleteId){const ws=publicWorkouts(s,athleteId);return ws.map(w=>({id:w.id,when:w.createdAt,ms:best(s,w)}));}
-  return {KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,safeCurrentProfile,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
+  return {canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
 });

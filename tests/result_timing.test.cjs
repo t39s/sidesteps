@@ -138,16 +138,16 @@ test('trainer history has one login below brand and athlete history panels',()=>
     const {state}=finish({child:true});state.device.lastInterface=mode;
     const f=fixture(state);f.api.setScreen('history');if(mode==='trainer')f.api.unlock();
     f.api.render();const html=f.app.innerHTML;
-    assert.equal((html.match(/data-act="pin"/g)||[]).length,1);
-    assert.match(html,/<header[\s\S]*class="mode-tag header-login">Войти<\/a>[\s\S]*<\/header>/);
-    assert.doesNotMatch(html,/data-act="back-history"|mode-tag">История/);
+    assert.equal((html.match(/data-act="pin"/g)||[]).length,mode==='child'?1:0);
+    if(mode==='child')assert.match(html,/<header[\s\S]*class="mode-tag header-login">Войти<\/a>[\s\S]*<\/header>/);
+    assert.match(html,/data-act="back-history"/);
     assert.match(html,/Мой прогресс/);assert.match(html,/history-chart/);
     assert.match(html,/Спортсмен/);
   }
 });
 test('trainer exit is a link and returns to athlete history',async()=>{
   const s=M.blank();s.device.lastInterface='trainer';const f=fixture(s);f.api.unlock();
-  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Выйти<\/a>/);
+  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Выйти из режима Тренера<\/a>/);
   assert.doesNotMatch(html,/Мои упражнения/);
   await f.api.handleAction('switch-athlete',{});assert.equal(f.api.screen(),'athlete');
 });
@@ -406,7 +406,7 @@ test('coach edits or cancels an athlete name without changing profile identity o
   const field={value:'',focus(){},select(){}};
   const name={textContent:profile.name},option={value:profile.id,textContent:profile.name};
   const toggle={closest:()=>row,focus(){},setAttribute(){}};
-  const form={hidden:true,dataset:{athleteId:profile.id},elements:{'athlete-name':field},matches:()=>true,closest:()=>row};
+  const form={hidden:true,dataset:{athleteId:profile.id},elements:{'athlete-name':field},matches:selector=>selector==='.athlete-rename',closest:()=>row};
   const row={querySelector(selector){return {'.athlete-rename':form,'[data-athlete-name]':name,'[data-act="rename-athlete"]':toggle}[selector];}};
   f.app.querySelectorAll=()=>[option];
 

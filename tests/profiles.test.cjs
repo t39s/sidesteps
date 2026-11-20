@@ -7,7 +7,14 @@ test('v6 base is mandatory, unique reference; v5 source unchanged',()=>{const v=
 test('multi migration requires explicit base and preserves all history',()=>{for(const name of ['v5-multiple','v5-running','v5-session']){const v=fixture(name),bytes=JSON.stringify(v);assert.throws(()=>M.migrateV5ToV6(v));const aid=v.athletes.at(-1).id,s=M.migrateV5ToV6(v,aid);assert.equal(s.baseProfileId,aid);for(const k of fields)assert.deepEqual(s[k],v[k]);assert.equal(JSON.stringify(v),bytes);assert.equal(s.device.trainerActivated,false);}});
 test('recovery runs after conversion, preserving attempt facts and session order',()=>{for(const name of ['v5-running','v5-session']){const v=fixture(name),s=M.migrateV5ToV6(v,v.athletes[0].id),r=M.recover(s).state;assert.deepEqual(r.childSessions,s.childSessions);assert.ok(r.attempts.every(a=>a.status!=='running'));assert.equal(JSON.stringify(v),JSON.stringify(fixture(name)));}});
 test('rename and rebase preserve IDs and histories; rebase needs permission',()=>{let s=history(two()),aid=s.athletes[1].id;assert.throws(()=>M.setBaseProfile(s,aid));s=M.renameAthlete(s,aid,'Другое имя').state;const before=M.clone(s);s=M.setBaseProfile(s,aid,true).state;for(const k of fields)assert.deepEqual(s[k],before[k]);assert.equal(s.baseProfileId,aid);});
-test('saved navigation never grants solo permission, including after import',()=>{let s=two(),aid=s.athletes[1].id;s.device.trainerActivated=true;s.device.trainerAthleteId=aid;assert.equal(M.safeCurrentProfile(s),s.baseProfileId);assert.throws(()=>M.startSolo(s,aid,1));let r=M.startSolo(s,aid,1,true);assert.throws(()=>M.startAttempt(r.state,r.value.id,'stopwatch',1));r=M.startAttempt(r.state,r.value.id,'stopwatch',1,M.iso(),true);assert.equal(r.value.athleteId,aid);});
+test('new solo workouts are restricted to the base, existing RC4 additional solo can resume with PIN',()=>{
+ const s=two(),aid=s.athletes[1].id;
+ assert.throws(()=>M.startSolo(s,aid,1,true),/базовому/);
+ const old=M.mutation(s,n=>{const w=M.newWorkout(n,aid,1);n.device.activeWorkoutId=w.id;return w;});
+ assert.throws(()=>M.startAttempt(old.state,old.value.id,'stopwatch',1));
+ const resumed=M.startAttempt(old.state,old.value.id,'stopwatch',1,M.iso(),true);
+ assert.equal(resumed.value.athleteId,aid);
+});
 test('delete last, base without replacement, active solo or participant is rejected immutably',()=>{assert.throws(()=>M.deleteProfileAndRebase(M.blank(),'athlete-default',null,true));let s=two(),bytes=JSON.stringify(s);assert.throws(()=>M.deleteProfileAndRebase(s,s.baseProfileId,null,true));assert.equal(JSON.stringify(s),bytes);let r=M.startSolo(s,s.baseProfileId,2);assert.throws(()=>M.deleteProfileAndRebase(r.state,s.baseProfileId,s.athletes[1].id,true));s=M.startChild(s,s.athletes.map(a=>a.id),2).state;assert.throws(()=>M.deleteProfileAndRebase(s,s.baseProfileId,s.athletes[1].id,true));assert.throws(()=>M.setBaseProfile(s,s.athletes[1].id,true));});
 test('atomic delete and rebase retains other participant history and valid historical session',()=>{let s=two(),ids=s.athletes.map(a=>a.id);s=M.startChild(s,ids,1).state;for(let i=0;i<2;i++){const t=M.nextTurn(s),a=M.startAttempt(s,t.workoutId,'stopwatch',1);s=M.finishAttempt(a.state,a.value.id,2000,[]).state;}const survivor=s.attempts.find(a=>a.athleteId===ids[1]),rev=s.revision;s=M.deleteProfileAndRebase(s,ids[0],ids[1],true).state;assert.equal(s.revision,rev+1);assert.equal(s.baseProfileId,ids[1]);assert.deepEqual(s.attempts,[survivor]);assert.equal(s.childSessions.length,1);M.validate(s);});
 test('import identical archive idempotently, key order and collection order irrelevant',()=>{let s=history(history(two()));const incoming=M.clone(s);incoming.archived.reverse();incoming.athletes=incoming.athletes.map(a=>({name:a.name,id:a.id}));let n=M.evaluateImport(s,incoming,true).state;for(const k of fields)assert.deepEqual(n[k],s[k]);assert.equal(n.baseProfileId,s.baseProfileId);});
@@ -25,3 +32,46 @@ test('all old session workouts may be absent without dropping the session or inv
 test('active session missing links and conflicting surviving workout ownership remain rejected',()=>{const v=M.clone(fixture('v5-deleted-session-workout'));v.childSessions[0].status='active';v.device.activeChildSessionId=v.childSessions[0].id;assert.throws(()=>M.migrateV5ToV6(v,v.athletes[0].id));const closed=M.clone(fixture('v5-deleted-session-workout'));closed.childSessions[0].workoutIds.reverse();assert.throws(()=>M.migrateV5ToV6(closed,closed.athletes[0].id),/связь занятия/);const n=M.migrateV5ToV6(fixture('v5-deleted-session-workout'),'athlete-default');n.childSessions[0].unavailableWorkoutIds.push(n.workouts[0].id);assert.throws(()=>M.validate(n),/отсутствующие/);});
 test('migrated historical snapshots survive export/import round trip and later record deletion',()=>{const v=fixture('v5-deleted-session-workout'),n=M.migrateV5ToV6(v,v.athletes[0].id);assert.deepEqual(M.evaluateImport(n,M.clone(n),true).state.childSessions,n.childSessions);const d=M.deleteRecord(n,'workout',n.workouts[0].id,true).state;assert.equal(d.attempts.length,0);M.validate(d);});
 test('delete either migrated profile retains the other historical participant and valid base',()=>{const v=fixture('v5-deleted-session-workout');for(const aid of v.athletes.map(a=>a.id)){const other=v.athletes.find(a=>a.id!==aid).id,n=M.migrateV5ToV6(v,v.athletes[0].id),d=M.deleteProfileAndRebase(n,aid,other,true).state;assert.equal(d.baseProfileId,other);assert.deepEqual(d.attempts,v.attempts.filter(a=>a.athleteId===other));assert.deepEqual(d.childSessions[0].athleteIds,[other]);M.validate(d);}});
+
+test('two workout comments preserve measurements, support independent edits, and enforce access',()=>{
+  const base=two(), aid=base.baseProfileId;
+  const solo=M.startSolo(base,aid,1);
+  const active=M.startAttempt(solo.state,solo.value.id,'intervals',2);
+  assert.throws(()=>M.saveWorkoutComments(active.state,solo.value.id,{athleteComment:'Рано'},true));
+  const finished=M.finishAttempt(active.state,active.value.id,1900,[900,1000]).state;
+  assert.throws(()=>M.saveWorkoutComments(finished,solo.value.id,{athleteComment:'Ок',trainerComment:'Недоступно'}));
+  const personal=M.saveWorkoutComments(finished,solo.value.id,{athleteComment:'Слова спортсмена'}).state;
+  const coached=M.saveWorkoutComments(personal,solo.value.id,{trainerComment:'Строка 1\r\nСтрока 2'},true).state;
+  const cleared=M.saveWorkoutComments(coached,solo.value.id,{athleteComment:'  '},true).state;
+  assert.equal(cleared.workouts[0].trainerComment,'Строка 1\nСтрока 2');
+  assert.equal(Object.hasOwn(cleared.workouts[0],'athleteComment'),false);
+  const {trainerComment,...w}=cleared.workouts[0];
+  assert.deepEqual(w,finished.workouts[0]);
+  assert.deepEqual(cleared.attempts,finished.attempts);
+  const other=base.athletes[1].id;
+  const rebased=M.setBaseProfile(M.renameAthlete(cleared,aid,'Новое имя').state,other,true).state;
+  assert.deepEqual(rebased.workouts,cleared.workouts);
+  assert.throws(()=>M.saveWorkoutComments(rebased,w.id,{athleteComment:'Нет доступа'}));
+  const child=M.startChild(base,[aid,other],1);
+  let s=child.state;
+  for(let i=0;i<2;i++){const a=M.startAttempt(s,M.nextTurn(s).workoutId,'stopwatch',1);s=M.finishAttempt(a.state,a.value.id,1000+i,[]).state;}
+  assert.throws(()=>M.saveWorkoutComments(s,s.workouts[0].id,{athleteComment:'Без PIN'}));
+  const edited=M.saveWorkoutComments(s,s.workouts[1].id,{athleteComment:'Со слов',trainerComment:'Совет'},true).state;
+  assert.deepEqual(edited.workouts[0],s.workouts[0]);
+});
+
+test('comment archive round trip treats empty and absent equally but rejects text conflicts atomically',()=>{
+  const solo=M.startSolo(M.blank(),'athlete-default',1),a=M.startAttempt(solo.state,solo.value.id,'stopwatch',1);
+  const old=M.finishAttempt(a.state,a.value.id,1900,[]).state;
+  const empty=M.clone(old);empty.workouts[0].athleteComment=' \n';empty.workouts[0].trainerComment='';
+  assert.deepEqual(M.evaluateImport(old,empty).state.workouts,old.workouts);
+  const s=M.saveWorkoutComments(old,solo.value.id,{athleteComment:'Первая\nстрока',trainerComment:'Совет'},true).state;
+  const exported=JSON.parse(JSON.stringify(s));exported.workouts[0].athleteComment='Первая\r\nстрока';
+  assert.deepEqual(M.evaluateImport(s,exported).state.workouts,s.workouts);
+  assert.deepEqual(M.evaluateImport(M.blank(),JSON.parse(JSON.stringify(s))).state.workouts,s.workouts);
+  const before=JSON.stringify(s);exported.workouts[0].trainerComment='Иной совет';
+  assert.throws(()=>M.evaluateImport(s,exported),/Конфликт/);
+  assert.equal(JSON.stringify(s),before);
+  exported.workouts[0].trainerComment=42;
+  assert.throws(()=>M.evaluateImport(s,exported),/Некорректный комментарий/);
+});

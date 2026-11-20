@@ -64,17 +64,41 @@ def test_profiles(browser):
     trainer(p)
     p.locator('#new-athlete').fill('Дополнительный');p.get_by_role('button',name='Добавить',exact=True).click()
     aid=state(p)['athletes'][1]['id']
-    row=p.locator(f'.athlete-row[data-athlete-id="{aid}"]')
-    # Use actual row container regardless CSS wrapper naming.
-    p.locator('#coach-athlete').select_option(aid)
-    p.get_by_role('button',name='Личная тренировка выбранного профиля').click()
-    new_exercise(p,attempts=1,mode='stopwatch');tap(p);tap(p)
+    assert p.locator('#coach-athlete,[data-act="coach-solo"]').count()==0
+    p.locator('#trainer-a').select_option(aid)
+    p.locator('#attempt-count').select_option('1')
+    p.locator('#mode-select').select_option('stopwatch')
+    p.get_by_role('button',name='Начать занятие').click()
+    assert p.locator('#pin-input').count()==0
+    p.get_by_role('link',name='К управлению занятием').click()
+    p.get_by_role('button',name='Вернуться к занятию').click()
+    # Exit cannot drop an active session or its current turn.
+    p.get_by_role('button',name='Выйти из режима Тренера').click()
+    assert state(p)['device']['activeChildSessionId']
+    tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][0]['athleteId']==aid
-    p.get_by_role('button',name='Выйти из полномочий Тренера').click()
+    assert state(p)['workouts'][0]['kind']=='child'
+    p.get_by_role('button',name='История',exact=True).click()
+    p.locator('summary').first.click()
+    p.get_by_label('Комментарий спортсмена').fill('Со слов спортсмена')
+    p.get_by_label('Комментарий тренера').fill('<b>Наблюдение</b>')
+    p.get_by_role('button',name='Сохранить комментарии').click()
+    assert state(p)['workouts'][0]['athleteComment']=='Со слов спортсмена'
+    assert state(p)['workouts'][0]['trainerComment']=='<b>Наблюдение</b>'
+    p.get_by_role('link',name='К управлению занятием').click()
+    assert p.get_by_role('button',name='Начать занятие').is_visible()
+    assert p.locator('#pin-input').count()==0
+    p.get_by_role('link',name='Выйти из режима Тренера').click()
     new_exercise(p,attempts=1,mode='stopwatch');tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][1]['athleteId']==state(p)['baseProfileId']
+    p.get_by_role('button',name='На главную').click()
+    p.locator('summary').first.click()
+    assert p.get_by_label('Комментарий тренера').count()==0
+    p.get_by_label('Комментарий спортсмена').fill('Личный комментарий')
+    p.get_by_role('button',name='Сохранить комментарии').click()
+    assert state(p)['workouts'][1]['athleteComment']=='Личный комментарий'
     trainer(p)
     def approve(d):
         d.accept('1') if d.type=='prompt' else d.accept()

@@ -124,6 +124,20 @@ def test_child_pair(browser):
     page.evaluate('Date.now = (()=>{let original=Date.now;return ()=>original()+10000;})()')
     page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=5000)
     assert page.locator('[data-act="child-view"]').count()==2
+    page.get_by_role('button',name='История',exact=True).click()
+    for index,name in enumerate(('Спортсмен','Маша')):
+        page.get_by_role('tab',name=name,exact=True).click()
+        page.locator('summary').first.click()
+        page.get_by_label('Комментарий спортсмена').fill(f'Самооценка {index}')
+        page.get_by_label('Комментарий тренера').fill(f'Наблюдение {index}')
+        page.get_by_role('button',name='Сохранить комментарии').click()
+    data=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
+    assert [(w['athleteComment'],w['trainerComment']) for w in data['workouts']]==[
+        ('Самооценка 0','Наблюдение 0'),('Самооценка 1','Наблюдение 1')]
+    page.get_by_role('button',name='Назад',exact=True).click()
+    page.get_by_role('link',name='К управлению занятием').click()
+    assert page.get_by_role('button',name='Начать занятие').is_visible()
+    assert page.locator('#pin-input').count()==0
     assert not errors,errors
     state=json.loads(page.evaluate('localStorage.getItem("interval-lab:data:v6")'))
     assert len([w for w in state['workouts'] if w['status']=='completed'])==2
