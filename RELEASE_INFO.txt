@@ -3,4 +3,4 @@ Release date: 2026-11-20
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.2.11, main 95a311973f4eec2a77b751f9b0991cfe780d8bb4
-Preview test preset: 4 intervals, rest 20 seconds, minimum tap gap 500 ms.
+Preview training preset: 20 intervals, rest 120 seconds, minimum tap gap 500 ms.
