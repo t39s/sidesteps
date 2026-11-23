@@ -1,11 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-test('athlete footer uses two-line version and coach link',()=>{
+test('athlete footer centers coach link above version',()=>{
   const app=get('app.js');
   assert.match(app,/athlete-footer/);
-  assert.match(app,/sidesteps<br>/);
-  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс<br>тренера<\/a>/);
-  assert.match(get('styles.css'),/\.athlete-footer\{[^}]*justify-content:space-between/);
+  assert.match(app,/\?'v\. ':'sidesteps v\. '/);
+  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера<\/a>/);
+  assert.match(get('styles.css'),/\.athlete-footer\{[^}]*flex-direction:column/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
   assert.doesNotMatch(get('manifest.webmanifest'),/0\.2\.3/);

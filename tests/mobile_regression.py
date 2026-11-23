@@ -146,15 +146,15 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='sidesteps\n0.3.3-rc.4'
+        assert version.inner_text()=='v. 0.3.3-rc.5'
         assert '·' not in footer.inner_text()
-        assert abs(version.bounding_box()['x']-footer.bounding_box()['x'])<1
-        assert abs(login.bounding_box()['x']+login.bounding_box()['width']-footer.bounding_box()['x']-footer.bounding_box()['width'])<1
+        assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
+        assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
+        assert login.bounding_box()['y']+login.bounding_box()['height']<=version.bounding_box()['y']
         assert login.get_attribute('title')=='Для Тренера'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
         assert login.evaluate(font)==version.evaluate(font)
-        assert abs(version.bounding_box()['y']-login.bounding_box()['y'])<1
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')

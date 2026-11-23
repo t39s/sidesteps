@@ -1,7 +1,7 @@
-sidesteps v0.3.3-rc.4
+sidesteps v0.3.3-rc.5
 Release date: 2026-11-23
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
 Preview testing preset: 4 intervals, rest 20 seconds, minimum tap gap 500 ms.
-Changes: athlete settings labels/order and two-line footer; presentation only.
+Changes: center the athlete footer with coach link above version; presentation only.
