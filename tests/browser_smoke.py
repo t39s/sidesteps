@@ -211,7 +211,8 @@ def test_rest_and_early_start(browser):
     page.get_by_text('Попытка 2 из 2').wait_for()
     tap(page);tap(page)
     page.get_by_text('Тренировка завершена').wait_for()
-    assert page.locator('main > .panel').count()==3
+    assert page.locator('main > .panel').count()==2
+    assert page.get_by_role('heading',name='Мой прогресс',exact=True).count()==0
     assert page.get_by_role('heading',name='Тренировки',exact=True).count()==0
     details=page.get_by_text('Подробнее',exact=True)
     details.click()
