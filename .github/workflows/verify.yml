@@ -63,14 +63,7 @@ jobs:
           python -m json.tool manifest.webmanifest > /dev/null
           sha256sum -c MANIFEST_SHA256.txt
       - name: Domain and UI tests
-        env:
-          SCOPE: ${{ steps.scope.outputs.value }}
-        run: |
-          if [ "$SCOPE" = full ]; then
-            node --test tests/*.test.cjs
-          else
-            node --test --test-name-pattern='athlete footer|trainer exit is a link|trainer session login stays' tests/ui_changes.test.cjs tests/result_timing.test.cjs
-          fi
+        run: node --test tests/*.test.cjs
       - name: Cache Python packages and Chromium
         uses: actions/cache@v4
         with:
