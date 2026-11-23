@@ -280,7 +280,7 @@ function childFinal(){
   const aid=allowed.includes(db.device.viewAthleteId)?db.device.viewAthleteId:allowed.at(-1);
   const session=latestChildSession();
   const workout=session?.workoutIds.map(id=>M.workoutOf(db,id)).find(w=>w?.athleteId===aid);
-  const summary=workout&&M.completed(db,workout).length?card(workoutSummary(aid,workout)+workoutDetails(workout,M.best(db,workout),true)):'';
+  const summary=workout&&M.completed(db,workout).length?card(workoutSummary(aid,workout)+workoutDetails(workout,M.best(db,workout),true)):card('<p class="note">Сохранённых результатов этой тренировки нет.</p>');
   return header('','',false,'<a href="#admin-login" data-act="pin" class="mode-tag header-login">Интерфейс тренера</a>')+card('<h1 class="hero-title center">Тренировка завершена</h1>')+
     athleteTabs(allowed,aid,'child-view')+profilePanel(aid,
       summary+(workout&&M.workingCompleted(db,workout).length?card('<h2>Мой прогресс</h2>'+graphic(M.renderChartData(db,aid),false,recordAsOf(aid))):''))+

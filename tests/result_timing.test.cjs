@@ -439,3 +439,15 @@ test('coach edits or cancels an athlete name without changing profile identity o
   assert.match(f.app.innerHTML,/Новое &lt;имя&gt;/);
   assert.throws(()=>M.renameAthlete(f.api.state(),profile.id,'  '),/Имя: от 1 до 50 символов/);
 });
+
+test('participant view stays informative when a migrated session workout is unavailable',()=>{
+  const old=require('./fixtures/v5-deleted-session-workout.json');
+  const s=M.migrateV5ToV6(old,old.athletes[0].id);
+  const session=s.childSessions[0],missing=session.unavailableWorkoutIds[0];
+  s.device.childParticipants=[...session.athleteIds];
+  s.device.viewAthleteId=session.athleteIds[session.workoutIds.indexOf(missing)];
+  s.device.lastInterface='child';
+  const f=fixture(s),html=f.api.childFinal();
+  assert.match(html,/role="tabpanel"/);
+  assert.match(html,/Сохранённых результатов этой тренировки нет/);
+});
