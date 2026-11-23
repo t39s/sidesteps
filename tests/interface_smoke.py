@@ -18,7 +18,11 @@ with sync_playwright() as playwright:
         assert page.get_by_role('button', name='Звук', exact=True).is_visible()
         assert page.get_by_role('button', name='Настройки', exact=True).is_visible()
         trainer(page)
-        page.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()
+        assert page.get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 1
+        assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
+        footer = page.locator('footer')
+        assert footer.inner_text().endswith(' · Интерфейс спортсмена')
+        footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()
         assert page.get_by_role('tab', name='История', exact=True).is_visible()
         assert page.get_by_role('link', name='Интерфейс тренера', exact=True).is_visible()
         assert not page.get_by_role('link', name='Интерфейс спортсмена', exact=True).count()

@@ -147,8 +147,14 @@ test('trainer history has one login below brand and athlete history panels',()=>
 });
 test('trainer exit is a link and returns to athlete history',async()=>{
   const s=M.blank();s.device.lastInterface='trainer';const f=fixture(s);f.api.unlock();
-  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Интерфейс спортсмена<\/a>/);
-  assert.doesNotMatch(html,/Мои упражнения/);
+  for(const screen of ['trainer','athlete','history']){
+    f.api.setScreen(screen);f.api.render();
+    const html=f.app.innerHTML;
+    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span> <span aria-hidden="true">·<\/span> <a href="#exit" data-act="switch-athlete">Интерфейс спортсмена<\/a>/);
+    assert.equal((html.match(/data-act="switch-athlete"/g)||[]).length,1);
+    assert.doesNotMatch(html,/<header[\s\S]*data-act="switch-athlete"[\s\S]*<\/header>/);
+    assert.doesNotMatch(html,/Мои упражнения/);
+  }
   await f.api.handleAction('switch-athlete',{});assert.equal(f.api.screen(),'athlete');
 });
 
