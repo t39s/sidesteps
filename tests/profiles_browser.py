@@ -96,7 +96,7 @@ def test_profiles(browser):
     p.get_by_role('button',name='На главную').click()
     p.locator('summary').first.click()
     assert p.get_by_label('Комментарий тренера').count()==0
-    p.get_by_label('Комментарий спортсмена').fill('Личный комментарий')
+    p.get_by_label('Комментарий',exact=True).fill('Личный комментарий')
     p.get_by_role('button',name='Сохранить комментарии').click()
     assert state(p)['workouts'][1]['athleteComment']=='Личный комментарий'
     trainer(p)
@@ -176,7 +176,7 @@ def test_personal_data_management(browser):
     p, errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
-    assert headings==['Тренировка','Анимация запуска','Обменяться данными',
+    assert headings==['Название профиля','Тренировка','Анимация запуска','Обменяться данными',
                       'Добавить архивный результат','Выборочно удалить данные'],headings
     assert p.get_by_role('button',name='Выгрузить',exact=True).is_visible()
     assert p.locator(f'[data-history-workout="{other["id"]}"]').count()==0
@@ -190,13 +190,12 @@ def test_personal_data_management(browser):
     p.once('dialog',lambda dialog:dialog.accept())
     workout.get_by_role('button',name='Удалить попытку',exact=True).first.click()
     assert len(next(w for w in state(p)['workouts'] if w['id']==own['id'])['attemptIds'])==1
-    workout.locator('summary').click()
-    def accept_last(dialog):
-        assert 'последнюю' in dialog.message
-        assert 'комментариями' in dialog.message
-        dialog.accept()
-    p.once('dialog',accept_last)
-    workout.get_by_role('button',name='Удалить попытку',exact=True).click()
+    assert workout.locator('summary').count()==0
+    assert workout.get_by_role('button',name='Удалить попытку',exact=True).count()==0
+    assert 'Попытка 2' not in workout.inner_text()
+    assert workout.get_by_text('3,000 с',exact=True).is_visible()
+    p.once('dialog',lambda dialog:dialog.accept())
+    workout.get_by_role('button',name='Удалить тренировку',exact=True).click()
     assert all(w['id']!=own['id'] for w in state(p)['workouts'])
     assert next(w for w in state(p)['workouts'] if w['id']==other['id'])==other
     p.locator('#archive-date').fill('2026-11-02')
@@ -205,12 +204,27 @@ def test_personal_data_management(browser):
     assert state(p)['archived'][-1]['athleteId']==aid
     assert state(p)['archived'][-1]['bestMs']==12345
     assert p.locator('[data-history-archive]').count()==2
+    assert p.locator('[data-history-archive] summary').count()==0
+    assert p.locator('[data-history-archive] [data-act="delete-archived"]').count()==2
+    assert [x['bestMs'] for x in sorted(state(p)['archived'],key=lambda a:a['date'],reverse=True)]==[12345,1500]
+    newest=state(p)['archived'][-1]['id']
+    assert p.locator('[data-history-archive]').first.get_attribute('data-history-archive')==newest
+    assert p.get_by_role('heading',name='Выборочно удалить данные').evaluate('(e)=>getComputedStyle(e).color')=='rgb(250, 143, 150)'
+    before_name=state(p)
+    p.get_by_label('Имя',exact=True).fill('Личный профиль')
+    p.get_by_role('button',name='Сохранить имя',exact=True).click()
+    assert state(p)['athletes'][0]['name']=='Личный профиль'
+    assert state(p)['athletes'][0]['id']==aid
+    for field in ('workouts','attempts','archived','childSessions'):
+        assert state(p)[field]==before_name[field]
+
     assert not state(p)['device']['trainerActivated']
     assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
     saved=p.evaluate('window.__dump()')
     p.close()
     q, errs2=make_page(browser,saved,viewport_width=375,mobile=True)
     assert len(state(q)['workouts'])==1
+    assert state(q)['athletes'][0]['name']=='Личный профиль'
     trainer(q)
     q.locator(f'[data-act="trainer-history"][data-id="{other["athleteId"]}"]').click()
     history=q.locator(f'[data-history-workout="{other["id"]}"]')

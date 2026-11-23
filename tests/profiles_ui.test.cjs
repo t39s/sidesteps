@@ -34,7 +34,7 @@ test('personal settings expose shared data management and scope manual archive i
   const p=await page();
   await p.api.handleAction('settings');
   assert.match(p.html(),/Обменяться данными[\s\S]*Выгрузить[\s\S]*Добавить архивный результат[\s\S]*Выборочно удалить данные/);
-  assert.match(p.html(),/Прерванные попытки[\s\S]*Завершенные попытки/);
+  assert.match(p.html(),/Прерванные попытки[\s\S]*Завершенные тренировки/);
   p.nodes['archive-athlete']={value:'foreign'};
   p.nodes['archive-date']={value:'2026-11-01'};
   p.nodes['archive-time']={value:'12,345'};
@@ -72,4 +72,53 @@ test('personal multiprofile import selection cancels safely and imports only sel
   assert.equal(p.api.state().baseProfileId,aid);
   assert.equal(p.api.state().archived.length,1);
   assert.equal(p.api.authorized(),false);
+});
+
+test('personal profile rename preserves identity and history in export and reload',async()=>{
+  let s=M.addAthlete(M.blank(),'Другой').state;
+  s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
+  const p=await page({[M.KEY]:JSON.stringify(s)});
+  await p.api.handleAction('settings');
+  assert.match(p.html(),/Название профиля[\s\S]*Тренировка/);
+  p.nodes['profile-name']={value:'  Моё имя  '};
+  await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
+  const out=p.api.exportSnapshot();
+  assert.equal(out.athletes[0].id,s.baseProfileId);
+  assert.equal(out.athletes[0].name,'Моё имя');
+  assert.deepEqual(out.archived,s.archived);
+  assert.equal(p.api.state().athletes[1].name,'Другой');
+  assert.equal(p.api.authorized(),false);
+  const q=await page(Object.fromEntries(p.data));
+  assert.equal(q.api.state().athletes[0].name,'Моё имя');
+});
+test('personal profile rename rejects invalid input and failed writes atomically',async()=>{
+  for(const value of ['', ' '.repeat(2), 'a'.repeat(51), 'Новое имя']){
+    const p=await page();
+    await p.api.handleAction('settings');
+    const before=p.data.get(M.KEY);
+    p.nodes['profile-name']={value};
+    if(value==='Новое имя')p.failWrite();
+    await p.api.handleAction('save-profile-name');
+    assert.equal(p.data.get(M.KEY),before);
+    assert.equal(p.api.state().athletes[0].name,'Спортсмен');
+  }
+});
+
+test('personal history counts the separate latest workout within the five-workout limit',async()=>{
+  let s=M.blank();
+  for(let i=0;i<6;i++){
+    const w=M.startSolo(s,s.baseProfileId,1);
+    const a=M.startAttempt(w.state,w.value.id,'stopwatch',1);
+    s=M.finishAttempt(a.state,a.value.id,1000+i*100,[]).state;
+    s.workouts.at(-1).createdAt=`2026-11-${String(i+1).padStart(2,'0')}T12:00:00.000Z`;
+    if(i>=4){
+      const p=await page({[M.KEY]:JSON.stringify(s)});
+      const html=p.html();
+      assert.ok(html.indexOf('<h2>Мой прогресс</h2>')<html.indexOf('<h2>Тренировка '));
+      const previous=html.split('<h2>Предыдущие тренировки</h2>')[1];
+      assert.equal((previous.match(/class="history-item"/g)||[]).length,4);
+      assert.equal(previous.includes('Все тренировки ('),i===5);
+      assert.match(html,/Комментарий<.*textarea name="athleteComment"/);
+    }
+  }
 });
