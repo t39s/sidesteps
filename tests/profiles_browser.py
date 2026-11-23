@@ -156,13 +156,16 @@ def test_personal_data_management(browser):
       let s=M.addAthlete(M.blank(),'Другой профиль').state;
       for (const aid of s.athletes.map(a=>a.id)) {
         const count=aid===s.baseProfileId?2:1;
-        let workout=M.startSolo(s,aid,count);s=workout.state;
+        const workout=aid===s.baseProfileId?M.startSolo(s,aid,count):M.startChild(s,[aid],count);
+        s=workout.state;
+        const wid=aid===s.baseProfileId?workout.value.id:M.nextTurn(s).workoutId;
         for(let i=0;i<count;i++) {
-          let attempt=M.startAttempt(s,workout.value.id,'stopwatch',1);
+          let attempt=M.startAttempt(s,wid,'stopwatch',1);
           s=M.finishAttempt(attempt.state,attempt.value.id,2000+i*1000,[]).state;
         }
       }
       s=M.addArchived(s,s.baseProfileId,'2026-11-01',1500).state;
+      s.device.lastInterface='athlete';s.device.childParticipants=[];s.device.viewAthleteId=s.baseProfileId;
       return JSON.stringify(s);
     }""")
     seed.close()
