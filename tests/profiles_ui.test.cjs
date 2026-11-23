@@ -1,18 +1,18 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),M=require('../model.js');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 async function page(initial={},options={}){
- const data=new Map(Object.entries(initial)),nodes={},events={},messages=[];let failWrite=false;
- const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener(){}};
+ const data=new Map(Object.entries(initial)),nodes={},events={},appEvents={},messages=[];let failWrite=false;
+ const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
  const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
  const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
- const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
+ const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
  window:browser,document:{getElementById:k=>k==='app'?app:k==='toast'?{style:{},set textContent(v){messages.push(v);}}:nodes[k],addEventListener(){}},
  localStorage:store,fetch:async()=>({ok:true,json:async()=>({...require('../config.json'),trainerAccess:options.noPin?null:require('../config.json').trainerAccess})}),
  navigator:{},console:{error(){}},Date,performance:{now:()=>1000},setTimeout(){},clearTimeout(){},setInterval(){},
  crypto:{subtle:{importKey:async()=>0,deriveBits:async()=>new Uint8Array(32).buffer}},TextEncoder,atob,
  });
- await new Promise(r=>setImmediate(r));return {data,store,nodes,events,messages,api:browser.api,html:()=>app.innerHTML,failWrite(){failWrite=true;}};
+ await new Promise(r=>setImmediate(r));return {data,store,nodes,events,appEvents,messages,api:browser.api,html:()=>app.innerHTML,failWrite(){failWrite=true;}};
 }
 const v5=require('./fixtures/v5-multiple.json');
 test('multi startup waits without any v5 or v6 write; cancel/reload/no PIN unchanged',async()=>{const bytes=JSON.stringify(v5);for(const noPin of [false,true]){const p=await page({[M.V5_KEY]:bytes},{noPin});assert.match(p.html(),/Выберите базовый профиль/);assert.equal(p.data.get(M.V5_KEY),bytes);assert.equal(p.data.has(M.KEY),false);await p.api.handleAction('pin-back');assert.equal(p.data.has(M.KEY),false);await p.api.init();assert.equal(p.data.get(M.V5_KEY),bytes);assert.equal(p.data.has(M.KEY),false);}});
@@ -108,8 +108,8 @@ test('personal history counts the separate latest workout within the five-workou
   let s=M.blank();
   for(let i=0;i<6;i++){
     const w=M.startSolo(s,s.baseProfileId,1);
-    const a=M.startAttempt(w.state,w.value.id,'stopwatch',1);
-    s=M.finishAttempt(a.state,a.value.id,1000+i*100,[]).state;
+    const a=M.startAttempt(w.state,w.value.id,'intervals',20);
+    s=M.finishAttempt(a.state,a.value.id,1000+i*100,Array(20).fill(50+i*5)).state;
     s.workouts.at(-1).createdAt=`2026-11-${String(i+1).padStart(2,'0')}T12:00:00.000Z`;
     if(i>=4){
       const p=await page({[M.KEY]:JSON.stringify(s)});
@@ -121,4 +121,44 @@ test('personal history counts the separate latest workout within the five-workou
       assert.match(html,/Комментарии<.*textarea name="athleteComment"/);
     }
   }
+});
+
+test('permanent trainer settings require current PIN authority, persist and stay outside exports',async()=>{
+  const p=await page();
+  p.nodes['working-count']={value:'30'};p.nodes['test-count']={value:'3'};
+  p.nodes['work-rest']={value:'90'};p.nodes['test-rest']={value:'15'};
+  const initial=p.data.get(M.SETTINGS_KEY);
+  await p.api.handleAction('save-trainer-settings');assert.equal(p.data.get(M.SETTINGS_KEY),initial);
+  p.api.unlock();await p.api.handleAction('pin');
+  await p.api.handleAction('save-trainer-settings');
+  assert.equal(p.api.settings().workingIntervalCount,30);
+  assert.equal(p.api.settings().workingCountLocked,true);
+  const saved=p.data.get(M.SETTINGS_KEY),out=p.api.exportSnapshot();
+  assert.equal(JSON.stringify(out).includes('workingIntervalCount'),false);
+  const q=await page(Object.fromEntries(p.data));
+  assert.equal(q.data.get(M.SETTINGS_KEY),saved);assert.equal(q.api.settings().testIntervalCount,3);
+  assert.equal(q.api.authorized(),false);assert.equal(q.api.state().device.soloMeasurementMode,'intervals');
+  assert.equal(q.api.state().device.soloPlannedAttempts,2);assert.equal(q.api.state().device.soundEnabled,false);
+  await q.api.importFile({text:async()=>JSON.stringify(out)});
+  assert.equal(q.data.get(M.SETTINGS_KEY),saved);
+});
+test('trainer settings quota and stale storage failures retain settings and history',async()=>{
+  for(const stale of [false,true]){
+    const p=await page();p.api.unlock();await p.api.handleAction('pin');
+    p.nodes['working-count']={value:'30'};p.nodes['test-count']={value:'3'};
+    p.nodes['work-rest']={value:'90'};p.nodes['test-rest']={value:'15'};
+    const history=p.data.get(M.KEY),original=p.api.settings().testIntervalCount;
+    if(stale)p.data.set(M.SETTINGS_KEY,'newer');else p.failWrite();
+    const before=p.data.get(M.SETTINGS_KEY);
+    await p.api.handleAction('save-trainer-settings');
+    assert.equal(p.data.get(M.KEY),history);assert.equal(p.data.get(M.SETTINGS_KEY),before);
+    assert.equal(p.api.settings().testIntervalCount,original);
+  }
+});
+test('existing installations preserve the accepted work count 20 and settings changes do not edit an active plan',async()=>{
+  const r=M.startSolo(M.blank(),'athlete-default',2,M.measurementPlan('test-intervals',M.defaultTrainerSettings(require('../config.json'),false)));
+  const p=await page({[M.KEY]:JSON.stringify(r.state)});
+  assert.equal(p.api.settings().workingIntervalCount,20);assert.equal(p.api.settings().workingCountLocked,true);
+  p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
+  assert.deepEqual(p.api.state().workouts[0].measurementPlan,r.state.workouts[0].measurementPlan);
 });

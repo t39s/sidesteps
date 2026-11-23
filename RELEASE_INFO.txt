@@ -1,7 +1,7 @@
-sidesteps v0.3.3-rc.5
+sidesteps v0.3.3-rc.6
 Release date: 2026-11-23
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
-Preview testing preset: 4 intervals, rest 20 seconds, minimum tap gap 500 ms.
-Changes: center the athlete footer with coach link above version; presentation only.
+Default modes: working 20 intervals, test 4 intervals, test stopwatch; rest 120/20 seconds; minimum tap gap 500 ms.
+Changes: permanent coach settings, frozen workout plans, working-only statistics, lossless archive projections for test and manual results.

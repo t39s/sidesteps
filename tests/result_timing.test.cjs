@@ -12,7 +12,7 @@ function fixture(state,soundEnabled=false){
   function SpeechSynthesisUtterance(text){this.text=text;}
   const confirmations=[];
   const window={confirm(text){confirmations.push(text);clock+=confirmWait;return confirmResult;},ILModel:M,speechSynthesis,SpeechSynthesisUtterance,addEventListener(){}};
-  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};db.device.soundEnabled=${soundEnabled};},state:()=>db,afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
+  const hooks=`window.testAPI={load(s){db=s;config=${JSON.stringify({...config,restDurationSec:15})};trainerSettingsState={...M.defaultTrainerSettings(config,false),workingCountLocked:true};db.device.soundEnabled=${soundEnabled};},state:()=>db,afterFinished,tick,resultProgress,sayAttempt,validateConfig,childReady,childFinal,restScreen,tap,historyScreen,trainerHome,handleAction,render,setScreen(s){screen=s;},unlock(){trainerUnlocked=true;},screen:()=>screen,until:()=>resultUntil};`;
   vm.runInNewContext(source.replace('init();\n})();',hooks+'\n})();'),{
     window,document:{body:{classList:{toggle(name,on){if(on)bodyClasses.add(name);else bodyClasses.delete(name);}}},getElementById:()=>app,addEventListener(){}},navigator:{},console,
     speechSynthesis,SpeechSynthesisUtterance,Date:TestDate,performance:{now:()=>clock},
@@ -23,7 +23,7 @@ function fixture(state,soundEnabled=false){
 }
 function finish({child=false,pair=false,record=false,planned=1}={}){
   let state=M.blank();
-  if(record)state=M.addArchived(state,'athlete-default','2026-01-01',10000).state;
+  if(record){const w=M.startSolo(state,'athlete-default',1);const a=M.startAttempt(w.state,w.value.id,'intervals',20);state=M.finishAttempt(a.state,a.value.id,10000,Array(20).fill(500)).state;}
   let workout;
   if(child){
     const ids=['athlete-default'];
@@ -31,8 +31,9 @@ function finish({child=false,pair=false,record=false,planned=1}={}){
     state=M.startChild(state,ids,planned).state;
     workout=M.nextTurn(state).workoutId;
   }else{const r=M.startSolo(state,'athlete-default',planned);state=r.state;workout=r.value.id;}
-  const a=M.startAttempt(state,workout,'stopwatch',4);state=a.state;
-  const result=M.finishAttempt(state,a.value.id,1446,[],new Date().toISOString());
+  const a=M.startAttempt(state,workout,'intervals',20);state=a.state;
+  const result=M.finishAttempt(state,a.value.id,1446,[...Array(19).fill(72),78],new Date().toISOString());
+  result.state.workouts.find(w=>w.id===workout).measurementPlan={purpose:'working',mode:'intervals',targetIntervals:20,restDurationSec:15};
   return {state:result.state,result:result.value};
 }
 for(const child of [false,true])for(const record of [false,true])for(const sound of [false,true]){
@@ -83,7 +84,7 @@ test('spoken seconds use tenths and correct Russian plural forms',()=>{
   }
 });
 test('record announcement follows the time',()=>{
-  const f=fixture(M.blank(),true);f.api.sayAttempt({totalMs:1446,recordEvent:true});
+  const {state,result}=finish({record:true});const f=fixture(state,true);f.api.sayAttempt(result.attempt);
   assert.deepEqual(f.spoken,['1,4 секунды']);f.utterances[0].onend();
   assert.deepEqual(f.spoken,['1,4 секунды','Новый рекорд!']);
 });
@@ -112,8 +113,8 @@ test('trainer final summary preserves participant selector and workout details',
   let s=M.blank();const added=M.addAthlete(s,'Б');s=added.state;
   s=M.startChild(s,['athlete-default',added.value.id],1).state;
   for(let i=0;i<2;i++){
-    const a=M.startAttempt(s,M.nextTurn(s).workoutId,'stopwatch',4);s=a.state;
-    s=M.finishAttempt(s,a.value.id,1500+i*100,[]).state;
+    const a=M.startAttempt(s,M.nextTurn(s).workoutId,'intervals',20);s=a.state;
+    s=M.finishAttempt(s,a.value.id,1500+i*100,Array(20).fill(75+i*5)).state;
   }
   const f=fixture(s);const html=f.api.childFinal();
   assert.match(html,/hero-title center">Тренировка завершена/);

@@ -6,17 +6,22 @@ import os
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 PIN='246810'
-CONFIG={'attemptCancelWindowSec':10,'minTapGapMs':0,'intervalCount':1,'restDurationSec':120,'resultDisplaySec':5,'recordDisplaySec':10,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
+CONFIG={'attemptCancelWindowSec':10,'minTapGapMs':500,'workingIntervalCount':1,'testIntervalCount':4,'testRestDurationSec':20,'restDurationSec':120,'resultDisplaySec':5,'recordDisplaySec':10,'audioPolicy':'off','trainerAccess':{'algorithm':'PBKDF2-SHA256','iterations':200000,'saltB64':'AAAAAAAAAAAAAAAAAAAAAA==','verifierB64':'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='}}
 
 def make_page(browser, data=None, pin=True, config_overrides=None, viewport_width=430, mobile=False):
     page=browser.new_page(viewport={'width':viewport_width,'height':900}, device_scale_factor=1, is_mobile=mobile, has_touch=mobile)
     errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
     page.set_content((ROOT/'index.html').read_text())
-    config={**CONFIG,**(config_overrides or {})};config['trainerAccess']=CONFIG['trainerAccess'] if pin else None
+    config={**CONFIG,**(config_overrides or {})};
+    if 'intervalCount' in config:config['workingIntervalCount']=config.pop('intervalCount')
+    config['minTapGapMs']=500
+    config['trainerAccess']=CONFIG['trainerAccess'] if pin else None
     js=f'''(()=>{{
       const data=new Map(Object.entries({json.dumps(data or {})}));
       Object.defineProperty(window,'localStorage',{{configurable:true,value:{{getItem:k=>data.has(k)?data.get(k):null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k),clear:()=>data.clear()}}}});
       window.__dump=()=>Object.fromEntries(data.entries());
+      const actualNow=performance.now.bind(performance);window.__tapOffset=0;
+      performance.now=()=>actualNow()+window.__tapOffset;
       window.fetch=async()=>({{ok:true,json:async()=>({json.dumps(config)})}});
       Object.defineProperty(window.crypto,'subtle',{{configurable:true,value:{{importKey:async(f,x)=>new Uint8Array(x),deriveBits:async(o,key,bits)=>new Uint8Array(32).fill(new TextDecoder().decode(key)==='{PIN}'?0:1).buffer}}}});
     }})();'''
@@ -32,7 +37,8 @@ def make_page(browser, data=None, pin=True, config_overrides=None, viewport_widt
         raise
     return page,errors
 
-def tap(page):
+def tap(page,advance=True):
+    if advance:page.evaluate('window.__tapOffset+=600')
     page.locator('.tap-surface').dispatch_event('pointerdown', {'button':0,'isPrimary':True})
     page.wait_for_timeout(90)
 
@@ -65,7 +71,7 @@ def test_adult(browser):
     assert page.get_by_role('button',name='Звук',exact=True).is_visible()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'
-    assert mode.locator('option:checked').inner_text()=='1 отсечка (по умолчанию)'
+    assert mode.locator('option:checked').inner_text()=='1 отсечка'
     page.locator('#attempt-count').select_option('1')
     mode.select_option('stopwatch')
     page.get_by_role('button',name='Назад из настроек',exact=True).click()
@@ -95,7 +101,9 @@ def test_adult(browser):
     assert state['attempts'][0]['status']=='completed',state
     assert state['workouts'][0]['status']=='completed'
     assert state['attempts'][0]['totalMs']>0
-    assert 'Мой прогресс' in page.locator('body').inner_text()
+    assert 'Тестовый результат' not in page.locator('body').inner_text()
+    assert 'сохранено в архив' in page.locator('body').inner_text()
+    assert 'Мой прогресс' not in page.locator('body').inner_text()
     page.screenshot(path=str(ROOT/'tests'/'adult_screenshot.png'))
     page.get_by_role('link',name='Приставные шаги на время').click()
     assert page.get_by_role('tab',name='История').get_attribute('aria-selected')=='true'
@@ -276,12 +284,12 @@ def test_intervals_20_taps(browser):
 def test_min_tap_gap_500ms(browser):
     page,errors=make_page(browser,pin=False,config_overrides={'intervalCount':1,'minTapGapMs':500})
     new_exercise(page, attempts=1)
-    tap(page)
+    tap(page,advance=False)
     # 90ms elapsed is rejected
-    tap(page)
+    tap(page,advance=False)
     assert page.get_by_text('Тренировка завершена').count()==0
     page.wait_for_timeout(480)
-    tap(page)
+    tap(page,advance=False)
     page.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors,errors
     page.close()

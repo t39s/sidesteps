@@ -264,9 +264,81 @@ def test_personal_profile_selection(browser):
     assert not errors+errs,errors+errs
     p.close()
 
+def test_modes_settings_and_statistics(browser):
+    p,errors=make_page(browser,config_overrides={'workingIntervalCount':20},viewport_width=375,mobile=True)
+    trainer(p)
+    p.get_by_label('Рабочее число отсечек',exact=True).fill('30')
+    p.get_by_label('Тестовое число отсечек',exact=True).fill('3')
+    p.get_by_label('Отдых рабочего режима, секунд',exact=True).fill('90')
+    p.get_by_label('Отдых тестовых режимов, секунд',exact=True).fill('15')
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    assert p.locator('#working-count').count()==0
+    settings=json.loads(p.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))
+    assert settings['workingIntervalCount']==30 and settings['workingCountLocked']
+    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
+    new_exercise(p,attempts=1,mode='test-intervals')
+    assert p.get_by_text('Тестовый режим · результат сохранится в архив',exact=True).is_visible()
+    for _ in range(4):tap(p)
+    assert p.get_by_text('Тестовый результат · сохранён в архив',exact=True).is_visible()
+    assert p.get_by_text('★ Новый рекорд!',exact=True).count()==0
+    p.get_by_role('heading',name='Тренировка завершена',exact=True).wait_for(timeout=6500)
+    assert p.get_by_role('heading',name='Мой прогресс',exact=True).count()==0
+    p.get_by_role('button',name='На главную',exact=True).click()
+    assert p.locator('[data-archive-workout]').count()==1
+    assert p.locator('.chart').count()==0
+    new_exercise(p,attempts=1,mode='intervals')
+    assert p.get_by_text('0 / 30 интервалов',exact=True).is_visible()
+    for _ in range(31):tap(p)
+    p.get_by_role('heading',name='Тренировка завершена',exact=True).wait_for(timeout=6500)
+    p.get_by_role('button',name='На главную',exact=True).click()
+    assert p.locator('.chart rect').count()==1
+    before=state(p)
+    assert [w['measurementPlan']['purpose'] for w in before['workouts']]==['test','working']
+    baseline=p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')
+    assert baseline==before['attempts'][1]['totalMs']
+    p.get_by_role('button',name='Настройки',exact=True).click()
+    p.locator('#archive-date').fill('2026-11-01');p.locator('#archive-time').fill('0,1')
+    p.get_by_role('button',name='Добавить в архив',exact=True).click()
+    assert p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')==baseline
+    saved=p.evaluate('window.__dump()');p.close()
+    q,errs=make_page(browser,saved,viewport_width=375,mobile=True)
+    restored=json.loads(q.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))
+    assert restored==settings
+    assert state(q)['device']['soloMeasurementMode']=='intervals'
+    assert state(q)['device']['soloPlannedAttempts']==2 and not state(q)['device']['soundEnabled']
+    assert q.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    assert not errors+errs,errors+errs
+    q.close()
+
+def test_frozen_test_workout_after_settings_and_reload(browser):
+    p,errors=make_page(browser,config_overrides={'workingIntervalCount':20},viewport_width=375,mobile=True)
+    trainer(p)
+    p.locator('#test-count').fill('3');p.locator('#test-rest').fill('30')
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
+    new_exercise(p,attempts=2,mode='test-intervals')
+    for _ in range(4):tap(p)
+    trainer(p)
+    p.locator('#test-count').fill('5');p.locator('#test-rest').fill('1')
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    assert state(p)['workouts'][0]['measurementPlan']['targetIntervals']==3
+    assert state(p)['workouts'][0]['measurementPlan']['restDurationSec']==30
+    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
+    saved=p.evaluate('window.__dump()');p.close()
+    q,errs=make_page(browser,saved,viewport_width=375,mobile=True)
+    clock=q.locator('[data-rest-clock]').inner_text()
+    assert int(clock.split(':')[1])>10,clock
+    q.get_by_role('button',name='Начать раньше',exact=True).click()
+    assert q.get_by_text('0 / 3 интервалов',exact=True).is_visible()
+    for _ in range(4):tap(q)
+    q.get_by_role('heading',name='Тренировка завершена',exact=True).wait_for(timeout=6500)
+    assert [a['targetIntervals'] for a in state(q)['attempts']]==[3,3]
+    assert not errors+errs,errors+errs
+    q.close()
+
 if __name__=='__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
-        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection]:
+        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection,test_modes_settings_and_statistics,test_frozen_test_workout_after_settings_and_reload]:
             check(b);print('PASS',check.__name__,flush=True)
         b.close()

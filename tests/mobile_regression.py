@@ -78,8 +78,8 @@ def test_history_chart_portrait(browser):
       for(let i=0;i<105;i++){
         const w=M.startSolo(s,'athlete-default',1);s=w.state;
         const when=new Date(Date.UTC(2026,9,1+i)).toISOString();
-        const a=M.startAttempt(s,w.value.id,'stopwatch',1,when);s=a.state;
-        s=M.finishAttempt(s,a.value.id,13000+i*1300,[],when).state;
+        const a=M.startAttempt(s,w.value.id,'intervals',20,when);s=a.state;
+        s=M.finishAttempt(s,a.value.id,13000+i*1300,Array(20).fill(650+i*65),when).state;
         s=M.mutation(s,n=>{n.workouts.find(x=>x.id===w.value.id).createdAt=when;}).state;
       }
       return JSON.stringify(s);
@@ -146,7 +146,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='v. 0.3.3-rc.5'
+        assert version.inner_text()=='v. 0.3.3-rc.6'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1

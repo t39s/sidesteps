@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict');const M=req
 const apply=(s,op)=>op.state;
 function add(s,n){let x=M.addAthlete(s,n);return [x.state,x.value];}
 function startSolo(){let s=M.blank(),r=M.startSolo(s,'athlete-default',2);return [r.state,r.value];}
-function simulate(s,w,ms,start,end,ordinal=1){let r=M.startAttempt(s,w.id,'stopwatch',20,start),z=M.finishAttempt(r.state,r.value.id,ms,[],end);return z;}
+function simulate(s,w,ms,start,end,ordinal=1){let r=M.startAttempt(s,w.id,'intervals',20,start),z=M.finishAttempt(r.state,r.value.id,ms,Array.from({length:20},(_,i)=>Math.floor(ms/20)+(i<ms%20?1:0)),end);return z;}
 function times(t=0){return new Date(Date.parse('2026-11-12T10:00:00Z')+t).toISOString()}
 test('new initial schema validates',()=>{let s=M.blank();assert.equal(M.validate(s),s);});
 test('one workout two attempts; first workout is baseline not record',()=>{let [s,w]=startSolo();let z=simulate(s,w,25000,times(0),times(30000));assert.equal(z.value.attempt.recordEvent,false);assert.equal(M.workoutOf(z.state,w.id).status,'pending');let y=simulate(z.state,w,24000,times(200000),times(230000));assert.equal(y.value.attempt.recordEvent,false);assert.equal(M.workoutOf(y.state,w.id).status,'completed');assert.equal(M.best(y.state,M.workoutOf(y.state,w.id)),24000);});

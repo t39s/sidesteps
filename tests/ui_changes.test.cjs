@@ -36,7 +36,7 @@ test('rest clock updates without replacing touch targets every tick',()=>{
 test('touch release voices a precise result once, with an independent display deadline',async()=>{
   const vm=require('node:vm');
   const M=require('../model.js');
-  const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0,resultDisplaySec:5,recordDisplaySec:10};
+  const config={...JSON.parse(get('config.json')),workingIntervalCount:1,minTapGapMs:500,resultDisplaySec:5,recordDisplaySec:10};
   const appEvents={},documentEvents={},spoken=[];
   let initial=M.blank();
   initial.device.soloPlannedAttempts=1;
@@ -53,7 +53,7 @@ test('touch release voices a precise result once, with an independent display de
   vm.runInNewContext(get('app.js'),{
     window:{ILModel:M,SideMigration:{run:()=>({})},addEventListener(){},speechSynthesis,SpeechSynthesisUtterance},
     document:{getElementById:()=>app,addEventListener:(name,handler)=>{documentEvents[name]=handler;}},
-    localStorage:{getItem:()=>state,setItem:(_key,value)=>{state=value;}},
+    localStorage:{getItem:key=>key===M.KEY?state:key===M.SETTINGS_KEY?JSON.stringify({...M.defaultTrainerSettings(config,false),workingCountLocked:true}):null,setItem:(key,value)=>{if(key===M.KEY)state=value;}},
     fetch:async()=>({ok:true,json:async()=>config}),
     navigator:{},performance:{now:()=>now},console,speechSynthesis,SpeechSynthesisUtterance,
     Date:TestDate,setInterval:fn=>{tick=fn;},setTimeout:(fn,ms)=>{if(ms===200)showResult=fn;},clearTimeout(){},

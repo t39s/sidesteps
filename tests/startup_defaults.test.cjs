@@ -68,7 +68,7 @@ test('first load starts muted with two interval attempts', async () => {
   page.click('open-exercise');
   assert.match(page.html(), /Попытка 1 из 2/);
   assert.match(page.html(), /play-glyph/);
-  assert.ok(page.html().includes(`0 / ${config.intervalCount} интервалов`));
+  assert.ok(page.html().includes(`0 / ${config.workingIntervalCount} интервалов`));
 });
 
 test('reload restores exercise defaults and preserves history and identity', async () => {
@@ -116,7 +116,7 @@ test('starting another exercise in the same page keeps user choices', async () =
 
 test('reload between attempts preserves the active workout and measurement mode', async () => {
   const started = M.startSolo(M.blank(), 'athlete-default', 2);
-  const attempt = M.startAttempt(started.state, started.value.id, 'stopwatch', config.intervalCount);
+  const attempt = M.startAttempt(started.state, started.value.id, 'stopwatch', config.workingIntervalCount);
   const finished = M.finishAttempt(attempt.state, attempt.value.id, 2000, []);
   const state = finished.state;
   state.device.measurementMode = 'stopwatch';
@@ -164,8 +164,8 @@ test('only a workout with two completed attempts gets a best-attempt mark', asyn
     const started = M.startSolo(state, 'athlete-default', durations.length);
     state = started.state;
     for (const duration of durations) {
-      const attempt = M.startAttempt(state, started.value.id, 'stopwatch', config.intervalCount);
-      state = M.finishAttempt(attempt.state, attempt.value.id, duration, []).state;
+      const attempt = M.startAttempt(state, started.value.id, 'intervals', config.workingIntervalCount);
+      state = M.finishAttempt(attempt.state, attempt.value.id, duration, Array(20).fill(duration/20)).state;
     }
   }
   workout([2000]);

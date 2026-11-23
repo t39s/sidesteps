@@ -54,7 +54,8 @@ test('closing during second attempt preserves first result, record and original 
   const retry=M.startAttempt(cancelled.state,w.id,'stopwatch',4,at(15000));
   const ended=M.endWorkout(retry.state,w.id,at(17000));
   assert.equal(ended.value.status,'completed');assert.equal(M.best(ended.state,ended.value),8000);
-  assert.equal(M.publicWorkouts(ended.state,'athlete-default').length,1);
+  assert.equal(M.publicWorkouts(ended.state,'athlete-default').length,0);
+  assert.equal(M.archivedWorkouts(ended.state,'athlete-default').length,1);
   assert.equal(M.completed(ended.state,ended.value).length,1);
 });
 test('recovery retains last saved partial data and records detection time, not fictional finish time',()=>{
@@ -91,7 +92,7 @@ test('coach can end whole session during measurement; existing results survive',
   s=M.checkpointAttempt(a.state,a.value.id,1500,[1000],at(6500)).state;
   s=M.forceCloseChild(s,at(6500)).state;
   assert.equal(M.currentChild(s),null);assert.equal(s.childSessions[0].status,'force_closed');
-  assert.equal(M.baseline(s,'athlete-default'),4000);
+  assert.equal(M.baseline(s,'athlete-default'),null);
   assert.equal(M.attemptOf(s,a.value.id).interruptionReason,'early_end');
   assert.equal(M.attemptOf(s,a.value.id).elapsedMs,1500);
 });
