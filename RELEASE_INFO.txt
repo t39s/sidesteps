@@ -1,7 +1,7 @@
-sidesteps v0.3.3-rc.3
+sidesteps v0.3.3-rc.4
 Release date: 2026-11-23
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
 Preview testing preset: 4 intervals, rest 20 seconds, minimum tap gap 500 ms.
-Changes: athlete history and footer layout, profile name settings, five-workout limit, simplified single-attempt deletion rows.
+Changes: athlete settings labels/order and two-line footer; presentation only.

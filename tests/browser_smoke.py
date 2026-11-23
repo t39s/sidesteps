@@ -61,7 +61,7 @@ def test_adult(browser):
     assert not json.loads(state['interval-lab:data:v6'])['workouts']
 
     page.get_by_role('button',name='Настройки',exact=True).click()
-    assert page.locator('.panel > h2:first-child').all_text_contents()==['Название профиля','Тренировка','Анимация запуска']
+    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка','Анимация запуска','Название профиля']
     assert page.get_by_role('button',name='Звук',exact=True).is_visible()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'

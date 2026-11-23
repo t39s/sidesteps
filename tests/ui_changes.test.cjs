@@ -1,10 +1,10 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-test('athlete footer contains the version and administrator link on one line',()=>{
+test('athlete footer uses two-line version and coach link',()=>{
   const app=get('app.js');
   assert.match(app,/athlete-footer/);
-  assert.match(app,/sidesteps v\. 0\.3\.3-rc\.3<\/span>/);
-  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера">Интерфейс тренера<\/a>/);
+  assert.match(app,/sidesteps<br>/);
+  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс<br>тренера<\/a>/);
   assert.match(get('styles.css'),/\.athlete-footer\{[^}]*justify-content:space-between/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);

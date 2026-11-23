@@ -9,7 +9,19 @@ with sync_playwright() as playwright:
         headless=True, args=['--no-sandbox'])
     for width in (375, 430):
         page, errors = make_page(browser, viewport_width=width, mobile=True)
-        assert page.locator('.app-version').inner_text().startswith('sidesteps v.')
+        footer=page.locator('footer')
+        version=footer.locator('.app-version')
+        login=footer.get_by_role('link',name='Интерфейс тренера',exact=True)
+        assert version.inner_text()=='sidesteps\n0.3.3-rc.4'
+        assert login.inner_text()=='Интерфейс\nтренера'
+        assert abs(version.bounding_box()['x']-footer.bounding_box()['x'])<1
+        assert abs(login.bounding_box()['x']+login.bounding_box()['width']-footer.bounding_box()['x']-footer.bounding_box()['width'])<1
+        page.get_by_role('button',name='Настройки',exact=True).click()
+        assert page.locator('.panel > h2').all_text_contents()==[
+            'Тренировка','Анимация запуска','Название профиля','Обменяться данными',
+            'Добавить архивный результат','Выборочно удалить данные']
+        assert page.get_by_label('Имя (указывается в файле выгрузки)',exact=True).is_visible()
+        page.get_by_role('button',name='Назад из настроек',exact=True).click()
         page.get_by_role('link', name='Интерфейс тренера', exact=True).click()
         assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
         assert page.get_by_role('button', name='Звук', exact=True).count() == 0

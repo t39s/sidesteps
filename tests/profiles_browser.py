@@ -96,7 +96,7 @@ def test_profiles(browser):
     p.get_by_role('button',name='На главную').click()
     p.locator('summary').first.click()
     assert p.get_by_label('Комментарий тренера').count()==0
-    p.get_by_label('Комментарий',exact=True).fill('Личный комментарий')
+    p.get_by_label('Комментарии',exact=True).fill('Личный комментарий')
     p.get_by_role('button',name='Сохранить комментарии').click()
     assert state(p)['workouts'][1]['athleteComment']=='Личный комментарий'
     trainer(p)
@@ -176,7 +176,7 @@ def test_personal_data_management(browser):
     p, errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
-    assert headings==['Название профиля','Тренировка','Анимация запуска','Обменяться данными',
+    assert headings==['Тренировка','Анимация запуска','Название профиля','Обменяться данными',
                       'Добавить архивный результат','Выборочно удалить данные'],headings
     assert p.get_by_role('button',name='Выгрузить',exact=True).is_visible()
     assert p.locator(f'[data-history-workout="{other["id"]}"]').count()==0
@@ -211,7 +211,7 @@ def test_personal_data_management(browser):
     assert p.locator('[data-history-archive]').first.get_attribute('data-history-archive')==newest
     assert p.get_by_role('heading',name='Выборочно удалить данные').evaluate('(e)=>getComputedStyle(e).color')=='rgb(250, 143, 150)'
     before_name=state(p)
-    p.get_by_label('Имя',exact=True).fill('Личный профиль')
+    p.get_by_label('Имя (указывается в файле выгрузки)',exact=True).fill('Личный профиль')
     p.get_by_role('button',name='Сохранить имя',exact=True).click()
     assert state(p)['athletes'][0]['name']=='Личный профиль'
     assert state(p)['athletes'][0]['id']==aid

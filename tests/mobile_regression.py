@@ -146,7 +146,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='sidesteps v. 0.3.3-rc.3'
+        assert version.inner_text()=='sidesteps\n0.3.3-rc.4'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']-footer.bounding_box()['x'])<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']-footer.bounding_box()['x']-footer.bounding_box()['width'])<1

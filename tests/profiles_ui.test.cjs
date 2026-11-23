@@ -79,7 +79,7 @@ test('personal profile rename preserves identity and history in export and reloa
   s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
   const p=await page({[M.KEY]:JSON.stringify(s)});
   await p.api.handleAction('settings');
-  assert.match(p.html(),/Название профиля[\s\S]*Тренировка/);
+  assert.match(p.html(),/Тренировка[\s\S]*Название профиля[\s\S]*Обменяться данными/);
   p.nodes['profile-name']={value:'  Моё имя  '};
   await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
   const out=p.api.exportSnapshot();
@@ -118,7 +118,7 @@ test('personal history counts the separate latest workout within the five-workou
       const previous=html.split('<h2>Предыдущие тренировки</h2>')[1];
       assert.equal((previous.match(/class="history-item"/g)||[]).length,4);
       assert.equal(previous.includes('Все тренировки ('),i===5);
-      assert.match(html,/Комментарий<.*textarea name="athleteComment"/);
+      assert.match(html,/Комментарии<.*textarea name="athleteComment"/);
     }
   }
 });

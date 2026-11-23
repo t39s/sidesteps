@@ -132,4 +132,4 @@ body.trainer-theme{background:#321B27}
 .workout-comments textarea{display:block;width:100%;font:inherit;font-size:16px;background:#0d2135;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:5px;resize:vertical}
 .comment-text{white-space:pre-wrap;overflow-wrap:anywhere}
 
-.athlete-footer{display:flex;align-items:baseline;justify-content:space-between;gap:12px;text-align:left}.athlete-footer>a{margin-left:auto}.deletion-title{color:var(--danger)}
+.athlete-footer{display:flex;align-items:baseline;justify-content:space-between;gap:12px;text-align:left}.athlete-footer>a{margin-left:auto;text-align:right}.deletion-title{color:var(--danger)}
