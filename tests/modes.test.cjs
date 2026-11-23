@@ -102,3 +102,66 @@ test('working record interpretation ignores old archive-dependent flags without 
   assert.equal(M.recordInfo(s,s.attempts[1]).previousRecordMs,3000);
   assert.equal(JSON.stringify(s),before);
 });
+
+test('archive statistics setting is optional for old settings, false by default and PIN protected',()=>{
+  const t=M.defaultTrainerSettings(config,true);assert.equal(t.includeArchiveStats,false);
+  const old={...t};delete old.includeArchiveStats;const bytes=JSON.stringify(old);
+  assert.equal(M.validateTrainerSettings(old),old);assert.equal(JSON.stringify(old),bytes);
+  assert.throws(()=>M.changeTrainerSettings(t,{includeArchiveStats:true}),/PIN/);
+  for(const value of [1,'true',null])assert.throws(()=>M.changeTrainerSettings(t,{includeArchiveStats:value},true));
+  const enabled=M.changeTrainerSettings(old,{includeArchiveStats:true},true);
+  assert.equal(enabled.includeArchiveStats,true);assert.equal(old.includeArchiveStats,undefined);
+  assert.equal(M.changeTrainerSettings(enabled,{includeArchiveStats:false},true).includeArchiveStats,false);
+});
+test('combined statistics count best attempt per workout and each manual archive once, preserving source bytes',()=>{
+  let s=workout(M.blank(),'intervals',20,[6000,5000]).state;
+  s=workout(s,'intervals',4,[1000,800]).state;
+  s=workout(s,'stopwatch',1,[900,600]).state;
+  s=M.addArchived(s,aid,'2026-10-01',200).state;
+  s=M.addAthlete(s,'Другой').state;
+  s=M.addArchived(s,s.athletes[1].id,'2026-10-01',100).state;
+  const bytes=JSON.stringify(s);
+  assert.deepEqual(M.renderChartData(s,aid,true).map(p=>p.ms),[200,5000,800,600]);
+  assert.equal(M.renderChartData(s,aid,true).reduce((sum,p)=>sum+p.ms,0)/4,1650);
+  assert.equal(M.baseline(s,aid,null,true),200);
+  assert.deepEqual(M.renderChartData(s,aid).map(p=>p.ms),[5000]);assert.equal(M.baseline(s,aid),5000);
+  assert.deepEqual(M.renderChartData(s,s.athletes[1].id,true).map(p=>p.ms),[100]);
+  assert.equal(JSON.stringify(s),bytes);
+});
+test('combined mixed workout produces one chart point and retains both original attempts',()=>{
+  let r=M.startSolo(M.blank(),aid,2),a=M.startAttempt(r.state,r.value.id,'intervals',20);
+  let s=M.finishAttempt(a.state,a.value.id,2000,Array(20).fill(100)).state;
+  a=M.startAttempt(s,r.value.id,'stopwatch',1);s=M.finishAttempt(a.state,a.value.id,1000).state;
+  const bytes=JSON.stringify(s);
+  assert.deepEqual(M.renderChartData(s,aid,true).map(p=>p.ms),[1000]);
+  assert.deepEqual(M.renderChartData(s,aid,false).map(p=>p.ms),[2000]);
+  assert.equal(M.baseline(s,aid,null,true),1000);assert.equal(JSON.stringify(s),bytes);
+});
+test('combined record events use previous test/manual results without rewriting historical flags',()=>{
+  let s=workout(M.blank(),'intervals',20,[5000]).state;
+  s=workout(s,'intervals',4,[1000]).state;
+  const testAttempt=s.attempts.at(-1);
+  assert.equal(M.recordInfo(s,testAttempt).recordEvent,false);
+  assert.deepEqual(M.recordInfo(s,testAttempt,true),{recordEvent:true,previousRecordMs:5000});
+  s=workout(s,'intervals',20,[4000]).state;
+  const working=s.attempts.at(-1);
+  assert.equal(M.recordInfo(s,working).recordEvent,true);assert.equal(M.recordInfo(s,working,true).recordEvent,false);
+  s=M.addArchived(s,aid,'2026-10-01',500).state;
+  const bytes=JSON.stringify(s);
+  assert.equal(M.recordInfo(s,testAttempt,true).recordEvent,false);
+  assert.equal(M.recordInfo(s,working,true).recordEvent,false);
+  assert.equal(JSON.stringify(s),bytes);
+  let manualFirst=M.addArchived(M.blank(),aid,'2026-10-01',3000).state;
+  manualFirst=workout(manualFirst,'stopwatch',1,[2000]).state;
+  assert.deepEqual(M.recordInfo(manualFirst,manualFirst.attempts[0],true),{recordEvent:true,previousRecordMs:3000});
+});
+test('combined records include completed attempts of pending workouts but chart excludes interrupted and unfinished workouts',()=>{
+  let s=workout(M.blank(),'intervals',20,[5000]).state;
+  const w=M.startSolo(s,aid,2),a=M.startAttempt(w.state,w.value.id,'stopwatch',1);
+  s=M.finishAttempt(a.state,a.value.id,500).state;
+  const interrupted=M.startAttempt(s,w.value.id,'stopwatch',1);s=M.interruptAttempt(interrupted.state,interrupted.value.id).state;
+  const bytes=JSON.stringify(s);
+  assert.equal(M.baseline(s,aid,null,true),500);
+  assert.deepEqual(M.renderChartData(s,aid,true).map(p=>p.ms),[5000]);
+  assert.equal(M.baseline(s,aid),5000);assert.equal(JSON.stringify(s),bytes);
+});

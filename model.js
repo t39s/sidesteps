@@ -37,17 +37,18 @@
     for(const key of ['workingIntervalCount','testIntervalCount'])assert(Number.isInteger(value[key])&&value[key]>=1&&value[key]<=200,'Число отсечек: целое 1–200');
     for(const key of ['workRestDurationSec','testRestDurationSec'])assert(Number.isInteger(value[key])&&value[key]>=0&&value[key]<=600,'Отдых: целое 0–600 секунд');
     assert(typeof value.workingCountLocked==='boolean','Некорректная фиксация рабочего числа');
+    assert(value.includeArchiveStats===undefined||typeof value.includeArchiveStats==='boolean','Некорректный выбор данных для статистики');
     return value;
   }
   function defaultTrainerSettings(config,existing=false){
     return validateTrainerSettings({version:1,workingIntervalCount:existing?20:config.workingIntervalCount,
       testIntervalCount:config.testIntervalCount,workRestDurationSec:config.restDurationSec,
-      testRestDurationSec:config.testRestDurationSec,workingCountLocked:existing});
+      testRestDurationSec:config.testRestDurationSec,workingCountLocked:existing,includeArchiveStats:false});
   }
   function changeTrainerSettings(current,patch,authorized=false){
     assert(authorized,'Требуется PIN Тренера');validateTrainerSettings(current);
     const next={...current};
-    for(const key of ['workingIntervalCount','testIntervalCount','workRestDurationSec','testRestDurationSec']){
+    for(const key of ['workingIntervalCount','testIntervalCount','workRestDurationSec','testRestDurationSec','includeArchiveStats']){
       if(Object.hasOwn(patch,key))next[key]=patch[key];
     }
     assert(!current.workingCountLocked||next.workingIntervalCount===current.workingIntervalCount,'Рабочее число отсечек уже зафиксировано');
@@ -72,14 +73,16 @@
     const plan=workoutOf(s,a.workoutId)?.measurementPlan;
     return a.mode==='intervals'&&(plan?plan.purpose==='working'&&a.targetIntervals===plan.targetIntervals:a.targetIntervals===20);
   }
-  function recordInfo(s,a){
-    if(!a||a.status!=='completed'||!isWorkingAttempt(s,a))return {recordEvent:false,previousRecordMs:null};
+  function recordInfo(s,a,includeArchive=false){
+    if(!a||a.status!=='completed'||(!includeArchive&&!isWorkingAttempt(s,a)))return {recordEvent:false,previousRecordMs:null};
     const w=workoutOf(s,a.workoutId);
-    if(!w.baselineExistsAtStart)return {recordEvent:false,previousRecordMs:null};
-    const before=s.attempts.filter(x=>x.id!==a.id&&x.athleteId===a.athleteId&&x.status==='completed'&&isWorkingAttempt(s,x)&&
+    if(!includeArchive&&!w.baselineExistsAtStart)return {recordEvent:false,previousRecordMs:null};
+    const before=s.attempts.filter(x=>x.id!==a.id&&x.athleteId===a.athleteId&&x.status==='completed'&&(includeArchive||isWorkingAttempt(s,x))&&
       (x.workoutId===w.id?x.ordinal<a.ordinal:Date.parse(x.endedAt)<=Date.parse(a.startedAt)));
-    const baselineAtStart=before.some(x=>x.workoutId!==w.id&&Date.parse(x.endedAt)<=Date.parse(w.firstStartedAt||a.startedAt));
-    const previous=before.length?Math.min(...before.map(x=>x.totalMs)):null;
+    const archives=includeArchive?s.archived.filter(x=>x.athleteId===a.athleteId&&Date.parse(x.date+'T00:00:00.000Z')<=Date.parse(w.firstStartedAt||a.startedAt)):[];
+    const baselineAtStart=archives.length>0||before.some(x=>x.workoutId!==w.id&&Date.parse(x.endedAt)<=Date.parse(w.firstStartedAt||a.startedAt));
+    const values=[...before.map(x=>x.totalMs),...archives.map(x=>x.bestMs)];
+    const previous=values.length?Math.min(...values):null;
     const recordEvent=baselineAtStart&&previous!==null&&a.totalMs<previous;
     return {recordEvent,previousRecordMs:recordEvent?previous:null};
   }
@@ -158,8 +161,9 @@
   const clone = s => structuredClone(s);
   const completed = (s,w) => w.attemptIds.map(id=>s.attempts.find(a=>a.id===id)).filter(a=>a && a.status==='completed');
   const best = (s,w) => {let a=completed(s,w);return a.length?Math.min(...a.map(x=>x.totalMs)):null;};
-  const baseline = (s,athleteId,excludeWorkoutId=null) => {
-    const values=s.attempts.filter(a=>a.status==='completed'&&a.athleteId===athleteId&&a.workoutId!==excludeWorkoutId&&isWorkingAttempt(s,a)).map(a=>a.totalMs);
+  const baseline = (s,athleteId,excludeWorkoutId=null,includeArchive=false) => {
+    const values=s.attempts.filter(a=>a.status==='completed'&&a.athleteId===athleteId&&a.workoutId!==excludeWorkoutId&&(includeArchive||isWorkingAttempt(s,a))).map(a=>a.totalMs);
+    if(includeArchive)values.push(...s.archived.filter(a=>a.athleteId===athleteId&&a.id!==excludeWorkoutId).map(a=>a.bestMs));
     return values.length?Math.min(...values):null;
   };
   const publicWorkouts = (s,athleteId) => s.workouts.filter(w=>w.athleteId===athleteId&&w.status==='completed'&&workingBest(s,w)!==null).sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
@@ -401,6 +405,12 @@
     else r=merge(s,incoming);
     r.state.device.trainerActivated=false;return r;
   }
-  function renderChartData(s,athleteId){const ws=publicWorkouts(s,athleteId);return ws.map(w=>({id:w.id,when:w.createdAt,ms:workingBest(s,w)}));}
+  function renderChartData(s,athleteId,includeArchive=false){
+    if(!includeArchive)return publicWorkouts(s,athleteId).map(w=>({id:w.id,when:w.createdAt,ms:workingBest(s,w)}));
+    const points=s.workouts.filter(w=>w.athleteId===athleteId&&w.status==='completed'&&completed(s,w).length)
+      .map(w=>({id:w.id,when:w.createdAt,ms:best(s,w)}));
+    points.push(...s.archived.filter(a=>a.athleteId===athleteId).map(a=>({id:a.id,when:a.date,ms:a.bestMs,dateOnly:true})));
+    return points.sort((a,b)=>Date.parse(a.when)-Date.parse(b.when)||a.id.localeCompare(b.id));
+  }
   return {SETTINGS_KEY,validateTrainerSettings,defaultTrainerSettings,changeTrainerSettings,validateMeasurementPlan,measurementPlan,workoutPlan,isWorkingAttempt,recordInfo,workingCompleted,workingBest,archivedWorkouts,canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,selectProfile,evaluatePersonalImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
 });

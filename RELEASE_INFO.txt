@@ -1,7 +1,7 @@
-sidesteps v0.3.3-rc.7
+sidesteps v0.3.3-rc.8
 Release date: 2026-11-23
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
 Default modes: working 20 intervals, test 4 intervals, test stopwatch; rest 120/20 seconds; minimum tap gap 500 ms.
-Changes: separate archive card; independently bounded history/attempt lists; explicit save/cancel settings; trainer backup layout and centered footer. Data schema v6, measurement model and config unchanged from rc.6.
+Changes: PIN-protected permanent archive statistics switch; record, average and charts use the selected scope in both interfaces and all profiles. Sports schema v6 and config unchanged.

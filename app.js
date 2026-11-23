@@ -107,7 +107,11 @@ function activePlan(w=currentTrainingWorkout()){
   return w?M.workoutPlan(db,w,trainerSettings()):selectedPlan();
 }
 function testNotice(plan){return plan.purpose==='test'?'<p class="note center test-mode">Тестовый режим · результат сохранится в архив</p>':'';}
-function isRecord(a){return M.recordInfo(db,a).recordEvent;}
+function includeArchiveStats(){return trainerSettings().includeArchiveStats===true;}
+function statsBest(workout){return includeArchiveStats()?M.best(db,workout):M.workingBest(db,workout);}
+function statsPoints(aid){return M.renderChartData(db,aid,includeArchiveStats());}
+function statsNote(){return '<p class="note statistics-scope">'+(includeArchiveStats()?'Рабочие, тестовые и архивные данные':'Только рабочие данные')+' · среднее по лучшим попыткам тренировок</p>';}
+function isRecord(a){return M.recordInfo(db,a,includeArchiveStats()).recordEvent;}
 function permanentTrainerSettings(){
   const t=trainerSettings();
   return card('<h2>Постоянные настройки</h2>'+ (t.workingCountLocked
@@ -116,7 +120,9 @@ function permanentTrainerSettings(){
     '<label>Тестовое число отсечек<input id="test-count" type="number" min="1" max="200" value="'+t.testIntervalCount+'"></label>'+
     '<label>Отдых рабочего режима, секунд<input id="work-rest" type="number" min="0" max="600" value="'+t.workRestDurationSec+'"></label>'+
     '<label>Отдых тестовых режимов, секунд<input id="test-rest" type="number" min="0" max="600" value="'+t.testRestDurationSec+'"></label>'+
-    '<p class="note">Для всех профилей устройства. Изменения действуют на новые тренировки. Настройки не входят в выгрузку данных.</p>'+b('Сохранить настройки','save-trainer-settings','primary wide'));
+    '<label class="statistics-option"><input id="include-archive-stats" type="checkbox" '+(t.includeArchiveStats===true?'checked':'')+'>Учитывать тестовые и архивные данные</label>'+
+    '<p class="note">Пересчитывает рекорд, среднее и графики для всех профилей в обоих интерфейсах. Исходные результаты сохраняются.</p>'+
+    '<p class="note">Для всех профилей устройства. Число отсечек и отдых действуют на новые тренировки. Настройки не входят в выгрузку данных.</p>'+b('Сохранить настройки','save-trainer-settings','primary wide'));
 }
 async function pinMatches(pin){if(!config.trainerAccess)return false;const p=config.trainerAccess;const bytes=str=>Uint8Array.from(atob(str),c=>c.charCodeAt(0));const enc=new TextEncoder().encode(pin);const key=await crypto.subtle.importKey('raw',enc,'PBKDF2',false,['deriveBits']);const bits=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',salt:bytes(p.saltB64),iterations:p.iterations,hash:'SHA-256'},key,256));const expected=bytes(p.verifierB64);if(bits.length!==expected.length)return false;let diff=0;for(let i=0;i<bits.length;i++)diff|=bits[i]^expected[i];return diff===0;}
 async function init(){if(M.KEY!=='interval-lab:data:v6'||!M.migrateV5ToV6){db=M.blank();renderError='Несовместимый кэш приложения. Подключитесь к сети и перезагрузите страницу.';render();return;}let recoveredTimeoutId=null;try{let response=await fetch('./config.json',{cache:'no-store'});if(!response.ok)throw Error('Не удалось загрузить config.json');config=validateConfig(await response.json());}catch(e){renderError=e.message;}
@@ -305,7 +311,7 @@ function childFinal(){
   const summary=workout&&M.completed(db,workout).length?card(workoutSummary(aid,workout)+workoutDetails(workout,M.best(db,workout),true)):card('<p class="note">Сохранённых результатов этой тренировки нет.</p>');
   return header('','',false,'<a href="#admin-login" data-act="pin" class="mode-tag header-login">Интерфейс тренера</a>')+card('<h1 class="hero-title center">Тренировка завершена</h1>')+
     athleteTabs(allowed,aid,'child-view')+profilePanel(aid,
-      summary+(workout&&M.workingCompleted(db,workout).length?card('<h2>Мой прогресс</h2>'+graphic(M.renderChartData(db,aid),false,recordAsOf(aid))):''))+
+      summary+(workout&&(includeArchiveStats()?M.completed(db,workout):M.workingCompleted(db,workout)).length?card('<h2>Мой прогресс</h2>'+statsNote()+graphic(statsPoints(aid),false,recordAsOf(aid))):''))+
     `<div class="buttons">${b('История','history-child','wide nav-return')}</div>`;
 }
 
@@ -313,10 +319,10 @@ function finalAdult(){
   const workout=M.workoutOf(db,viewId);
   if(!workout)return adultHome();
   const summary=workoutSummary(workout.athleteId,workout);
-  const points=M.renderChartData(db,workout.athleteId);
+  const points=statsPoints(workout.athleteId);
   return header('','',true)+card('<h1 class="hero-title center">Тренировка завершена</h1>')+
     card(summary+workoutDetails(workout,M.best(db,workout),true))+
-    (M.workingCompleted(db,workout).length?card('<h2>Мой прогресс</h2>'+graphic(points,false,recordAsOf(workout.athleteId))):'')+
+    ((includeArchiveStats()?M.completed(db,workout):M.workingCompleted(db,workout)).length?card('<h2>Мой прогресс</h2>'+statsNote()+graphic(points,false,recordAsOf(workout.athleteId))):'')+
     `<div class="buttons">${b('На главную','final-home','wide nav-return')}</div>`;
 }
 function initializeProgressScroll(){
@@ -343,34 +349,34 @@ function graphic(points,scrollable=false,highlightMs=undefined){
   }));
   const lines=ticks.map(tick=>`<line x1="${left}" y1="${tick.y}" x2="${W-right}" y2="${tick.y}" stroke="#38536b" stroke-width=".7"/>`).join('');
   const labels=ticks.map(tick=>`<text x="35" y="${tick.y+3}" text-anchor="end" class="svg-txt">${tick.label}</text>`).join('')+'<text x="8" y="12" class="svg-txt">с</text>';
-  const bars=visible.map((p,i)=>{const x=left+slot*(i+.5),w=slot*.63,yy=y(p.ms),color=p.ms===best?'#ffd166':'#83def3';const label=(p.ms/1000).toFixed(1).replace('.',',');return `<g class="chart-bar"><title>${esc(M.datetime(p.when))}: ${esc(M.fmt(p.ms))}</title><rect x="${x-w/2}" y="${yy}" width="${w}" height="${Math.max(.8,floor-yy)}" rx="3" fill="${color}"/><text x="${x}" y="${Math.max(top+3,yy-5)}" text-anchor="middle" class="chart-value">${label}</text><text x="${x}" y="${H-15}" text-anchor="middle" class="chart-date">${esc(M.date(p.when))}</text></g>`;}).join('');
+  const bars=visible.map((p,i)=>{const x=left+slot*(i+.5),w=slot*.63,yy=y(p.ms),color=p.ms===best?'#ffd166':'#83def3';const label=(p.ms/1000).toFixed(1).replace('.',',');return `<g class="chart-bar"><title>${esc(p.dateOnly?p.when:M.datetime(p.when))}: ${esc(M.fmt(p.ms))}</title><rect x="${x-w/2}" y="${yy}" width="${w}" height="${Math.max(.8,floor-yy)}" rx="3" fill="${color}"/><text x="${x}" y="${Math.max(top+3,yy-5)}" text-anchor="middle" class="chart-value">${label}</text><text x="${x}" y="${H-15}" text-anchor="middle" class="chart-date">${esc(M.date(p.when))}</text></g>`;}).join('');
   const averageLine=average===null?'':`<line class="chart-average" x1="${left}" y1="${y(average)}" x2="${W-right}" y2="${y(average)}" stroke="#ffd166" stroke-width="1.4"><title>Среднее по всем тренировкам: ${esc(M.fmt(Math.round(average)))}</title></line>`;
   const chart=`<svg class="chart"${scrollable?` style="width:${W}px"`:''} viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Столбчатый график последних ${visible.length} завершённых тренировок, в секундах, ось от нуля${average===null?'':`, среднее по всем тренировкам ${esc(M.fmt(Math.round(average)))}`}">${lines}${averageLine}${bars}${scrollable?'':labels}</svg>`;
   if(scrollable)return `<div class="history-chart"><svg class="history-chart-axis" viewBox="0 0 40 ${H}" aria-hidden="true">${labels}</svg><div class="chart-scrollable" tabindex="0" role="region" aria-label="Диаграмма прогресса">${chart}</div></div>`;
   return `<div class="chart-wrap">${chart}</div>`;
 }
-function recordAsOf(athleteId){return M.baseline(db,athleteId);}
+function recordAsOf(athleteId){return M.baseline(db,athleteId,null,includeArchiveStats());}
 function workoutSummary(athleteId,workout,heading=false){
   const workouts=M.publicWorkouts(db,athleteId);
   const record=recordAsOf(athleteId);
   const attempts=workout?M.completed(db,workout):[];
-  const best=workout?(M.workingBest(db,workout)??M.best(db,workout)):null;
-  const working=attempts.some(a=>M.isWorkingAttempt(db,a));
-  const improvements=attempts.map(a=>({...a,...M.recordInfo(db,a)})).filter(a=>a.recordEvent);
+  const best=workout?(statsBest(workout)??M.best(db,workout)):null;
+  const working=includeArchiveStats()||attempts.some(a=>M.isWorkingAttempt(db,a));
+  const improvements=attempts.map(a=>({...a,...M.recordInfo(db,a,includeArchiveStats())})).filter(a=>a.recordEvent);
   const subtitle=workout?`Тренировка ${esc(M.datetime(workout.createdAt))}`:'Пока нет тренировок';
-  const firstOnly=workouts.length===1;
+  const firstOnly=(includeArchiveStats()?statsPoints(athleteId).length:workouts.length)===1;
   const title=heading?`<h2>${subtitle}</h2>`:`<div class="muted">${subtitle}</div>`;
   if(workout&&!working)return `${title}<p class="note">${archiveSource(workout)} · сохранено в архив</p>${best!==null?row('Лучшее время',M.fmt(best)):''}`;
   return `${title}${best!==null&&best!==undefined?`<div class="metric"><span>Лучшее время</span><strong>${recordTime(best,athleteId,attempts.some(a=>isRecord(a)))}</strong></div>`:''}${attempts.some(a=>isRecord(a))?'<div class="record">★ Новый рекорд!</div>':''}${improvements.length?`<div class="note">Улучшение на ${M.fmt(Math.max(...improvements.map(a=>a.previousRecordMs-a.totalMs)))}</div>`:''}${record!==null?row(firstOnly?'Исходный результат':'Рекорд',M.fmt(record)):''}`;
 }
 function progress(athleteId,child=false,separate=false){
   const last=M.publicWorkouts(db,athleteId).at(-1);
-  const points=M.renderChartData(db,athleteId);
+  const points=statsPoints(athleteId);
   const summary=workoutSummary(athleteId,last,separate);
-  const chart='<h2>Мой прогресс</h2><p class="note">Рабочий режим · среднее по лучшим попыткам тренировок</p>'+graphic(points,separate);
+  const chart='<h2>Мой прогресс</h2>'+statsNote()+graphic(points,separate);
   const workouts=historyItems(athleteId,child,separate),archives=archiveHistory(athleteId);
   if(separate){
-    const latest=card(summary+(last?workoutDetails(last,M.workingBest(db,last),true,true):''));
+    const latest=card(summary+(last?workoutDetails(last,statsBest(last),true,true):''));
     return (db.device.lastInterface==='athlete'?card(chart)+latest:latest+card(chart))+card(workouts)+archives;
   }
   return card(`${summary}<div class="progress-chart">${chart}</div>${workouts}`)+archives;
@@ -404,10 +410,10 @@ function workoutComments(workout,editable){
 }
 function workoutDetails(workout,best,sharedScale,editable=false,archiveOnly=false){
   const all=M.completed(db,workout);
-  const attempts=archiveOnly?all.filter(a=>!M.isWorkingAttempt(db,a)):M.workingCompleted(db,workout).length?M.workingCompleted(db,workout):all;
+  const attempts=archiveOnly?all.filter(a=>!M.isWorkingAttempt(db,a)):includeArchiveStats()?all:M.workingCompleted(db,workout).length?M.workingCompleted(db,workout):all;
   const intervals=sharedScale?attempts.flatMap(a=>a.mode==='intervals'?(a.intervalsMs??[]):[]):[];
   const sharedMax=sharedScale?Math.max(1,...intervals):undefined;
-  return `<details><summary>Подробнее</summary><div class="note">${esc(M.datetime(workout.createdAt))}</div>${attempts.map(a=>row(`Попытка ${a.ordinal}`,(M.isWorkingAttempt(db,a)?recordTime(a.totalMs,a.athleteId,isRecord(a)):M.fmt(a.totalMs))+(attempts.length>1&&a.totalMs===best&&!isRecord(a)&&a.totalMs!==recordAsOf(a.athleteId)?'<span aria-label="Лучшая попытка"> ★</span>':''))+intervalDetails(a,sharedMax)).join('')}${workoutComments(workout,editable)}</details>`;
+  return `<details><summary>Подробнее</summary><div class="note">${esc(M.datetime(workout.createdAt))}</div>${attempts.map(a=>row(`Попытка ${a.ordinal}`,((includeArchiveStats()||M.isWorkingAttempt(db,a))?recordTime(a.totalMs,a.athleteId,isRecord(a)):M.fmt(a.totalMs))+(attempts.length>1&&a.totalMs===best&&!isRecord(a)&&a.totalMs!==recordAsOf(a.athleteId)?'<span aria-label="Лучшая попытка"> ★</span>':''))+intervalDetails(a,sharedMax)).join('')}${workoutComments(workout,editable)}</details>`;
 }
 function archiveSource(w){
   const a=M.completed(db,w).find(a=>!M.isWorkingAttempt(db,a));
@@ -416,9 +422,9 @@ function archiveSource(w){
 }
 function archiveHistory(aid){
   const entries=M.archivedWorkouts(db,aid).map(w=>({date:w.createdAt,id:w.id,
-    html:`<div class="history-item" data-archive-workout="${esc(w.id)}"><span>Тренировка ${esc(M.datetime(w.createdAt))}</span><p class="note">${archiveSource(w)}</p><strong>${M.fmt(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)))}</strong>${workoutDetails(w,M.best(db,w),true,true,true)}</div>`}));
+    html:`<div class="history-item" data-archive-workout="${esc(w.id)}"><span>Тренировка ${esc(M.datetime(w.createdAt))}</span><p class="note">${archiveSource(w)}</p><strong>${includeArchiveStats()?recordTime(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)),aid,M.completed(db,w).some(a=>!M.isWorkingAttempt(db,a)&&isRecord(a))):M.fmt(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)))}</strong>${workoutDetails(w,M.best(db,w),true,true,true)}</div>`}));
   for(const a of db.archived.filter(a=>a.athleteId===aid))entries.push({date:a.date,id:a.id,
-    html:`<div class="history-item"><span>${esc(a.date)} · Ручной ввод · </span><strong>${M.fmt(a.bestMs)}</strong></div>`});
+    html:`<div class="history-item"><span>${esc(a.date)} · Ручной ввод · </span><strong>${includeArchiveStats()?recordTime(a.bestMs,aid):M.fmt(a.bestMs)}</strong></div>`});
   entries.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
   const key=`archive:${db.device.lastInterface}:${aid}`,list=boundedList(entries,key);
   return entries.length?card('<h2>Архивные тренировки</h2><div class="history-list" data-list-container="'+esc(key)+'">'+list.items.map(x=>x.html).join('')+list.control+'</div>','archive-history'):'';
@@ -430,7 +436,7 @@ function historyItems(aid,child=false,personal=false){
   const key=`history:${db.device.lastInterface}:${aid}`,list=boundedList(ordered,key,{limit:personal?4:5,total});
   return `<h2>${personalView?'Предыдущие тренировки':'Тренировки'}</h2>${!ordered.length?muted(personal?'Нет предыдущих тренировок':'Нет завершённых тренировок'):''}
     <div class="history-list" data-list-container="${esc(key)}">${list.items.map(w=>{
-      const bs=M.workingBest(db,w);
+      const bs=statsBest(w);
       return `<div class="history-item"><div class="row between"><span class="muted">${esc(M.date(w.createdAt))}</span><strong>${recordTime(bs,aid,M.completed(db,w).some(a=>isRecord(a)))}</strong></div>${workoutDetails(w,bs,personal,true)}</div>`;
     }).join('')}${list.control}</div>`;
 }
@@ -486,7 +492,7 @@ function appSettings(){
 function archiveForm(options=''){
   return card('<h2>Добавить архивный результат</h2>'+
     (options?'<label>Спортсмен<select id="archive-athlete">'+options+'</select></label>':'')+
-    '<p class="note">Ручной ввод. Не учитывается в рекорде, среднем и прогрессе.</p><label>Дата<input type="date" id="archive-date"></label>'+
+    '<p class="note">Ручной ввод. '+(includeArchiveStats()?'Учитывается в рекорде, среднем и прогрессе.':'Не учитывается в рекорде, среднем и прогрессе.')+'</p><label>Дата<input type="date" id="archive-date"></label>'+
     '<label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label>'+
     '<div class="buttons">'+b('Добавить в архив','add-archive',options?'primary wide':'primary')+'</div>');
 }
@@ -561,7 +567,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
 }
 function baseChoice(source,action,personal=false){return card('<h1>'+(personal?'Выберите профиль для загрузки':'Выберите базовый профиль')+'</h1><label>Профиль<select id="base-choice">'+source.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${source.workouts.filter(w=>w.athleteId===a.id).length} тренировок · ${source.archived.filter(w=>w.athleteId===a.id).length} архивных результатов</option>`).join('')+'</select></label><p>'+(personal?'Будет загружен только выбранный профиль.':'Этот профиль будет доступен без PIN.')+'</p>'+b(personal?'Загрузить профиль':'Назначить базовым',action,'primary wide'));}
 function pinScreen(){return header('','',false,'',false)+card(`<h2>Вход в интерфейс тренера</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного Тренером, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!trainerUnlocked&&!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.3-rc.7</span>${trainerUnlocked&&!renderError?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
+function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!trainerUnlocked&&!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.3-rc.8</span>${trainerUnlocked&&!renderError?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -815,7 +821,7 @@ async function handleAction(name,button){try{
    if(!trainerUnlocked||screen!=='trainer')return;
    const t=trainerSettings();
    const patch={workingIntervalCount:t.workingCountLocked?t.workingIntervalCount:Number($('working-count').value),
-     testIntervalCount:Number($('test-count').value),workRestDurationSec:Number($('work-rest').value),testRestDurationSec:Number($('test-rest').value)};
+     testIntervalCount:Number($('test-count').value),workRestDurationSec:Number($('work-rest').value),testRestDurationSec:Number($('test-rest').value),includeArchiveStats:Boolean($('include-archive-stats')?.checked)};
    writeTrainerSettings(M.changeTrainerSettings(t,patch,trainerUnlocked));
    message('Настройки сохранены');render();return;
  }

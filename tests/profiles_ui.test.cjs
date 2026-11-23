@@ -5,7 +5,7 @@ async function page(initial={},options={}){
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
  const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
  const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
- const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,archiveHistory,historyItems,historyManagement,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
+ const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,statsPoints,recordAsOf,workoutDetails,archiveHistory,historyItems,historyManagement,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
  window:browser,document:{getElementById:k=>k==='app'?app:k==='toast'?{style:{},set textContent(v){messages.push(v);}}:nodes[k],addEventListener(){}},
  localStorage:store,fetch:async()=>({ok:true,json:async()=>({...require('../config.json'),trainerAccess:options.noPin?null:require('../config.json').trainerAccess})}),
@@ -254,4 +254,33 @@ test('settings opened from a new workout omit the profile name and preserve its 
   await p.api.handleAction('settings-save');
   assert.deepEqual(p.api.state().workouts[0].measurementPlan,plan);
   assert.equal(p.api.state().device.soloMeasurementMode,'stopwatch');
+});
+
+test('archive statistics save only after coach PIN, persist across exit/reload and are absent from exports',async()=>{
+  const s=longListsState(),p=await page({[M.KEY]:JSON.stringify(s)});
+  p.nodes['include-archive-stats']={checked:true};
+  const original=p.data.get(M.SETTINGS_KEY);
+  await p.api.handleAction('save-trainer-settings');assert.equal(p.data.get(M.SETTINGS_KEY),original);
+  p.api.unlock();await p.api.handleAction('pin');
+  p.nodes['test-count']={value:'4'};p.nodes['work-rest']={value:'120'};p.nodes['test-rest']={value:'20'};
+  const before=p.data.get(M.KEY);await p.api.handleAction('save-trainer-settings');
+  assert.equal(p.data.get(M.KEY),before);assert.equal(p.api.settings().includeArchiveStats,true);
+  assert.equal(p.api.statsPoints(s.baseProfileId).length,14);
+  assert.equal(JSON.stringify(p.api.exportSnapshot()).includes('includeArchiveStats'),false);
+  await p.api.handleAction('switch-athlete');assert.equal(p.api.authorized(),false);
+  assert.equal(p.api.statsPoints(s.baseProfileId).length,14);assert.doesNotMatch(p.html(),/id="include-archive-stats"/);
+  const q=await page(Object.fromEntries(p.data));assert.equal(q.api.settings().includeArchiveStats,true);
+  assert.equal(q.api.statsPoints(s.baseProfileId).length,14);
+  const setting=q.data.get(M.SETTINGS_KEY);await q.api.importFile({text:async()=>JSON.stringify(p.api.exportSnapshot())});
+  assert.equal(q.data.get(M.SETTINGS_KEY),setting);assert.equal(q.api.authorized(),false);
+});
+test('failed archive statistics settings write retains previous calculations and sports data',async()=>{
+  const s=longListsState(),p=await page({[M.KEY]:JSON.stringify(s)});
+  p.api.unlock();await p.api.handleAction('pin');
+  p.nodes['include-archive-stats']={checked:true};p.nodes['test-count']={value:'4'};
+  p.nodes['work-rest']={value:'120'};p.nodes['test-rest']={value:'20'};
+  const before=p.data.get(M.KEY),settings=p.data.get(M.SETTINGS_KEY);p.failWrite();
+  await p.api.handleAction('save-trainer-settings');
+  assert.equal(p.data.get(M.KEY),before);assert.equal(p.data.get(M.SETTINGS_KEY),settings);
+  assert.equal(p.api.statsPoints(s.baseProfileId).length,7);assert.notEqual(p.api.settings().includeArchiveStats,true);
 });

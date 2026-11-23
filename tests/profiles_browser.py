@@ -422,9 +422,70 @@ def test_trainer_backup_geometry(browser):
         assert not errors,errors
         p.close()
 
+
+def test_archive_statistics_switch(browser):
+    seed,errors=make_page(browser)
+    raw=seed.evaluate("""()=>{
+      const M=ILModel;let s=M.blank();
+      for(const [mode,target,values] of [['intervals',20,[6000,5000]],['intervals',4,[1000,800]],['stopwatch',1,[900,600]]]){
+        const w=M.startSolo(s,s.baseProfileId,2);s=w.state;
+        let clock=Date.UTC(2026,10,1)+s.workouts.length*100000;
+        s.workouts.at(-1).createdAt=new Date(clock).toISOString();
+        for(const ms of values){
+          const a=M.startAttempt(s,w.value.id,mode,target,new Date(clock).toISOString());
+          s=M.finishAttempt(a.state,a.value.id,ms,mode==='intervals'?Array.from({length:target},(_,i)=>Math.floor(ms/target)+(i<ms%target?1:0)):[],new Date(clock+ms).toISOString()).state;
+          clock+=ms+1000;
+        }
+      }
+      s=M.addArchived(s,s.baseProfileId,'2026-10-01',200).state;
+      s=M.addAthlete(s,'Другой').state;
+      return JSON.stringify(M.addArchived(s,s.athletes[1].id,'2026-10-01',100).state);
+    }""")
+    seed.close()
+    p,errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
+    original=state(p)
+    assert p.locator('.chart rect').count()==1
+    trainer(p)
+    switch=p.get_by_label('Учитывать тестовые и архивные данные',exact=True)
+    assert not switch.is_checked()
+    switch.check()
+    assert not json.loads(p.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))['includeArchiveStats']
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    assert switch.is_checked()
+    other=original['athletes'][1]['id']
+    p.locator(f'[data-act="trainer-history"][data-id="{other}"]').click()
+    assert p.locator('.chart rect').count()==1
+    assert 'Рабочие, тестовые и архивные данные' in p.locator('.statistics-scope').inner_text()
+    p.get_by_role('button',name='Назад',exact=True).click()
+    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
+    assert p.locator('#include-archive-stats').count()==0
+    assert p.locator('.chart rect').count()==4
+    assert '1,650' in p.locator('.chart-average title').text_content()
+    assert '0,200' in p.locator('.archive-history .record').inner_text()
+    assert p.locator('.chart-bar title').first.text_content().startswith('2026-10-01:')
+    assert p.locator('.archive-history .record').count()>=1
+    for field in ('workouts','attempts','archived','athletes'):
+        assert state(p)[field]==original[field],field
+    saved=p.evaluate('window.__dump()');p.close()
+    p,e=make_page(browser,saved,viewport_width=375,mobile=True)
+    assert p.locator('.chart rect').count()==4
+    assert p.locator('#include-archive-stats').count()==0
+    trainer(p)
+    p.get_by_label('Учитывать тестовые и архивные данные',exact=True).uncheck()
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
+    assert p.locator('.chart rect').count()==1
+    assert 'Только рабочие данные' in p.locator('.statistics-scope').inner_text()
+    assert p.locator('.archive-history .record').count()==0
+    for field in ('workouts','attempts','archived','athletes'):
+        assert state(p)[field]==original[field],field
+    assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    assert not errors+errs+e,errors+errs+e
+    p.close()
+
 if __name__=='__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
-        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection,test_modes_settings_and_statistics,test_frozen_test_workout_after_settings_and_reload,test_settings_draft_and_bounded_lists,test_trainer_backup_geometry]:
+        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection,test_modes_settings_and_statistics,test_frozen_test_workout_after_settings_and_reload,test_settings_draft_and_bounded_lists,test_trainer_backup_geometry,test_archive_statistics_switch]:
             check(b);print('PASS',check.__name__,flush=True)
         b.close()
