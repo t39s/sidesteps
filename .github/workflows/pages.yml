@@ -9,6 +9,7 @@ on:
     branches: [develop]
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
@@ -27,15 +28,36 @@ jobs:
         with:
           ref: main
           path: stable-src
-      - name: Checkout validated candidate
+      - name: Checkout candidate for a stable or manual publication
+        if: github.event_name != 'workflow_run'
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || 'develop' }}
+          ref: develop
           path: preview-src
+      - name: Download verified candidate
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: sidesteps-candidate-${{ github.event.workflow_run.head_sha }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: verified
+      - name: Check artifact identity and extract candidate
+        if: github.event_name == 'workflow_run'
+        env:
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          current=$(git ls-remote https://github.com/${{ github.repository }}.git refs/heads/develop | cut -f1)
+          test "$current" = "$EXPECTED_SHA"
+          test "$(cat verified/candidate.commit)" = "$EXPECTED_SHA"
+          (cd verified && sha256sum -c candidate.sha256)
+          mkdir preview-src
+          unzip -q verified/sidesteps_candidate.zip -d preview-src
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
       - name: Validate stable and candidate
+        if: github.event_name != 'workflow_run'
         run: |
           for dir in stable-src preview-src; do
             node --check "$dir/model.js"
@@ -46,6 +68,10 @@ jobs:
             python3 -m json.tool "$dir/manifest.webmanifest" > /dev/null
             (cd "$dir" && sha256sum -c MANIFEST_SHA256.txt)
           done
+      - name: Check packaged source integrity
+        run: |
+          (cd stable-src && sha256sum -c MANIFEST_SHA256.txt)
+          (cd preview-src && sha256sum -c MANIFEST_SHA256.txt)
       - name: Build Pages directory
         run: |
           mkdir -p public/preview

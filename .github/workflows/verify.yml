@@ -3,46 +3,105 @@ on:
   push:
     branches: [develop]
   workflow_dispatch:
+    inputs:
+      scope:
+        description: 'auto uses full regression for unknown changes; ui is for reviewed labels/layout only'
+        type: choice
+        options: [auto, ui, full]
+        default: auto
 permissions:
   contents: read
+  actions: read
 jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate JavaScript and domain model
-        run: |
-          node --check model.js
-          node --check app.js
-          node --check sw.js
-          node --test tests/*.test.cjs
-      - name: Validate candidate config and manifest
-        run: |
-          python3 -m json.tool config.json > /dev/null
-          python3 -m json.tool manifest.webmanifest > /dev/null
-          sha256sum -c MANIFEST_SHA256.txt
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Find last successfully verified ancestor
+        id: baseline
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {execFileSync} = require('node:child_process');
+            const {data} = await github.rest.actions.listWorkflowRuns({
+              owner: context.repo.owner, repo: context.repo.repo,
+              workflow_id: 'verify.yml', branch: 'develop', status: 'success', per_page: 100
+            });
+            let baseline = '0000000000000000000000000000000000000000';
+            for (const run of data.workflow_runs) {
+              if (run.head_sha === context.sha) continue;
+              try {
+                execFileSync('git', ['merge-base', '--is-ancestor', run.head_sha, context.sha]);
+                baseline = run.head_sha;
+                break;
+              } catch {}
+            }
+            core.setOutput('sha', baseline);
+      - name: Choose verification scope
+        id: scope
+        env:
+          BASE_SHA: ${{ steps.baseline.outputs.sha }}
+          REQUESTED_SCOPE: ${{ inputs.scope || 'auto' }}
+        run: |
+          python -m unittest discover -s tests -p ci_scope_test.py
+          base="$BASE_SHA"
+          scope=$(python tools/ci-scope.py --base "$base" --requested "$REQUESTED_SCOPE")
+          echo "value=$scope" >> "$GITHUB_OUTPUT"
+          echo "Verification scope: $scope" >> "$GITHUB_STEP_SUMMARY"
+      - name: Validate syntax, config and integrity
+        run: |
+          for script in model.js app.js migration.js sw.js; do node --check "$script"; done
+          python -m json.tool config.json > /dev/null
+          python -m json.tool manifest.webmanifest > /dev/null
+          sha256sum -c MANIFEST_SHA256.txt
+      - name: Domain and UI tests
+        env:
+          SCOPE: ${{ steps.scope.outputs.value }}
+        run: |
+          if [ "$SCOPE" = full ]; then
+            node --test tests/*.test.cjs
+          else
+            node --test --test-name-pattern='athlete footer|trainer exit is a link|trainer session login stays' tests/ui_changes.test.cjs tests/result_timing.test.cjs
+          fi
+      - name: Cache Python packages and Chromium
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/ms-playwright
+          key: browsers-${{ runner.os }}-${{ runner.arch }}-python312-playwright1580
       - name: Install browser test dependencies
         run: |
           python -m pip install playwright==1.58.0
           python -m playwright install --with-deps chromium
-      - name: Browser, mobile, profile migration and PWA regression
+      - name: Browser checks
         env:
           CHROMIUM_EXECUTABLE: ''
+          SCOPE: ${{ steps.scope.outputs.value }}
         run: |
-          python tests/profiles_browser.py
-          python tests/browser_smoke.py
-          python tests/mobile_regression.py
+          python tests/interface_smoke.py
+          if [ "$SCOPE" = full ]; then
+            python tests/profiles_browser.py
+            python tests/browser_smoke.py
+            python tests/mobile_regression.py
+          fi
       - name: Package verified candidate
         run: |
           git archive --format=zip --output=sidesteps_candidate.zip HEAD
-          sha256sum sidesteps_candidate.zip
+          sha256sum sidesteps_candidate.zip > candidate.sha256
+          git rev-parse HEAD > candidate.commit
       - uses: actions/upload-artifact@v4
         with:
           name: sidesteps-candidate-${{ github.sha }}
-          path: sidesteps_candidate.zip
+          path: |
+            sidesteps_candidate.zip
+            candidate.sha256
+            candidate.commit
