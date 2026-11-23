@@ -169,7 +169,7 @@ test('participant tabs select the same athlete on final and history screens',asy
   assert.match(f.app.innerHTML,selected('athlete-default'));
   await f.api.handleAction('history-child',{});
   assert.match(f.app.innerHTML,selected('athlete-default'));
-  assert.match(f.app.innerHTML,/header-login">Войти/);
+  assert.match(f.app.innerHTML,/header-login">Интерфейс тренера/);
   await f.api.handleAction('history-profile',{dataset:{id:added.value.id}});
   assert.match(f.app.innerHTML,selected(added.value.id));
   assert.match(f.app.innerHTML,/1,600/);
