@@ -12,7 +12,11 @@ with sync_playwright() as playwright:
         assert page.locator('.app-version').inner_text().startswith('sidesteps v.')
         page.get_by_role('link', name='Интерфейс тренера', exact=True).click()
         assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
+        assert page.get_by_role('button', name='Звук', exact=True).count() == 0
+        assert page.get_by_role('button', name='Настройки', exact=True).count() == 0
         page.get_by_role('button', name='Назад', exact=True).click()
+        assert page.get_by_role('button', name='Звук', exact=True).is_visible()
+        assert page.get_by_role('button', name='Настройки', exact=True).is_visible()
         trainer(page)
         page.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()
         assert page.get_by_role('tab', name='История', exact=True).is_visible()
