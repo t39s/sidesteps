@@ -3,7 +3,7 @@ const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer centers coach link above version',()=>{
   const app=get('app.js');
   assert.match(app,/athlete-footer/);
-  assert.match(app,/\?'v\. ':'sidesteps v\. '/);
+  assert.match(app,/app-version">v\. 0\.3\.3-rc\.7/);
   assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера<\/a>/);
   assert.match(get('styles.css'),/\.athlete-footer\{[^}]*flex-direction:column/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
@@ -42,7 +42,7 @@ test('touch release voices a precise result once, with an independent display de
   initial.device.soloPlannedAttempts=1;
   let state=JSON.stringify(initial),now=1000,clock=Date.now(),tick,showResult;
   class TestDate extends Date { static now(){return clock;} }
-  const app={innerHTML:'',querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
+  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
   let heldSpeech=null,holdSpeech=true;
   const speechSynthesis={cancel(){},speak:utterance=>{
     spoken.push(utterance.text);
@@ -62,7 +62,7 @@ test('touch release voices a precise result once, with an independent display de
   const click=act=>appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act}})}});
   click('settings');
   appEvents.change({target:{id:'attempt-count',value:'1'}});
-  click('settings-back');
+  click('settings-save');
   appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act:'toggle-sound'},setAttribute(){}})}});
   click('open-exercise');
   const touch=pointerId=>({pointerId,pointerType:'touch',button:0,target:{closest:()=>true},preventDefault(){}});

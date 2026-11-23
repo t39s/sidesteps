@@ -212,7 +212,7 @@ def test_personal_data_management(browser):
     assert p.get_by_role('heading',name='Выборочно удалить данные').evaluate('(e)=>getComputedStyle(e).color')=='rgb(250, 143, 150)'
     before_name=state(p)
     p.get_by_label('Имя (указывается в файле выгрузки)',exact=True).fill('Личный профиль')
-    p.get_by_role('button',name='Сохранить имя',exact=True).click()
+    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
     assert state(p)['athletes'][0]['name']=='Личный профиль'
     assert state(p)['athletes'][0]['id']==aid
     for field in ('workouts','attempts','archived','childSessions'):
@@ -336,9 +336,95 @@ def test_frozen_test_workout_after_settings_and_reload(browser):
     assert not errors+errs,errors+errs
     q.close()
 
+
+def test_settings_draft_and_bounded_lists(browser):
+    seed, errors=make_page(browser)
+    raw=seed.evaluate("""()=>{
+      const M=ILModel;let s=M.blank();
+      for(let i=0;i<7;i++){
+        const w=M.startSolo(s,s.baseProfileId,1),a=M.startAttempt(w.state,w.value.id,'intervals',20);
+        s=M.finishAttempt(a.state,a.value.id,1000+i*100,Array(20).fill(50+i*5)).state;
+        s.workouts.at(-1).createdAt=`2026-11-${String(i+1).padStart(2,'0')}T12:00:00.000Z`;
+        s=M.addArchived(s,s.baseProfileId,`2026-10-${String(i+1).padStart(2,'0')}`,2000+i*100).state;
+      }
+      const w=M.startSolo(s,s.baseProfileId,1);s=w.state;
+      for(let i=0;i<7;i++){
+        const a=M.startAttempt(s,w.value.id,'intervals',20,`2026-11-${String(i+1).padStart(2,'0')}T13:00:00.000Z`);
+        s=M.interruptAttempt(a.state,a.value.id).state;
+      }
+      return JSON.stringify(M.endWorkout(s,w.value.id).state);
+    }""")
+    seed.close()
+    for width in (320,375):
+        p, errs=make_page(browser,{KEY:raw},viewport_width=width,mobile=True)
+        aid=state(p)['baseProfileId']
+        archive=p.locator(f'[data-list-container="archive:athlete:{aid}"]')
+        history=p.locator(f'[data-list-container="history:athlete:{aid}"]')
+        assert p.locator('.archive-history').count()==1
+        assert archive.locator(':scope > .history-item').count()==5
+        assert history.locator(':scope > .history-item').count()==4
+        archive.get_by_role('button',name='Все тренировки (7)',exact=True).click()
+        assert archive.locator(':scope > .history-item').count()==7
+        assert history.locator(':scope > .history-item').count()==4
+        p.get_by_role('button',name='Настройки',exact=True).click()
+        before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
+        manage=p.locator(f'[data-list-container="manage:athlete:{aid}"]')
+        interrupted=p.locator(f'[data-list-container="interrupted:athlete:{aid}"]')
+        assert manage.locator(':scope > .history-item').count()==5
+        assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==5
+        p.locator('#profile-name').fill('Черновик')
+        p.locator('#attempt-count').select_option('1')
+        p.locator('#mode-select').select_option('stopwatch')
+        p.locator('input[name="launch-animation"][value="none"]').check()
+        assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
+        manage.get_by_role('button',name='Все тренировки (14)',exact=True).click()
+        assert manage.locator(':scope > .history-item').count()==14
+        assert p.locator('#profile-name').input_value()=='Черновик'
+        interrupted.get_by_role('button',name='Все попытки (7)',exact=True).click()
+        assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==7
+        p.once('dialog',lambda dialog:dialog.accept())
+        manage.locator('[data-history-archive]').first.get_by_role('button',name='Удалить тренировку',exact=True).click()
+        assert manage.locator(':scope > .history-item').count()==13
+        p.get_by_role('button',name='Не сохранять',exact=True).click()
+        assert state(p)['athletes'][0]['name']=='Спортсмен'
+        assert len(state(p)['archived'])==6
+        assert state(p)['device']['soloPlannedAttempts']==2
+        assert archive.locator(':scope > .history-item').count()==6
+        p.get_by_role('button',name='Настройки',exact=True).click()
+        p.locator('#profile-name').fill('Сохранено')
+        p.locator('#attempt-count').select_option('1')
+        p.locator('#mode-select').select_option('stopwatch')
+        p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+        assert state(p)['athletes'][0]['name']=='Сохранено'
+        assert state(p)['device']['soloPlannedAttempts']==1
+        assert state(p)['device']['soloMeasurementMode']=='stopwatch'
+        p.get_by_role('tab',name='Новая тренировка',exact=True).click()
+        p.get_by_role('button',name='Настройки',exact=True).click()
+        assert p.locator('#profile-name').count()==0
+        assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        assert not errors+errs,errors+errs
+        p.close()
+
+def test_trainer_backup_geometry(browser):
+    for width in (320,375):
+        p,errors=make_page(browser,viewport_width=width,mobile=True)
+        trainer(p)
+        backups=p.locator('.backup-actions')
+        export=backups.get_by_role('button',name='Выгрузить',exact=True).bounding_box()
+        load=backups.get_by_role('button',name='Загрузить',exact=True).bounding_box()
+        reset=backups.get_by_role('button',name='Удалить все локальные данные',exact=True).bounding_box()
+        assert abs(export['width']-load['width'])<1 and abs(export['y']-load['y'])<1
+        assert reset['y']>=export['y']+export['height']
+        assert abs(reset['width']-backups.bounding_box()['width'])<1
+        add=p.get_by_role('button',name='Добавить в архив',exact=True)
+        assert abs(add.bounding_box()['width']-add.locator('..').bounding_box()['width'])<1
+        assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        assert not errors,errors
+        p.close()
+
 if __name__=='__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
-        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection,test_modes_settings_and_statistics,test_frozen_test_workout_after_settings_and_reload]:
+        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection,test_modes_settings_and_statistics,test_frozen_test_workout_after_settings_and_reload,test_settings_draft_and_bounded_lists,test_trainer_backup_geometry]:
             check(b);print('PASS',check.__name__,flush=True)
         b.close()

@@ -3,8 +3,9 @@
 const M=window.ILModel,$=id=>document.getElementById(id),app=$('app');
 let trainerSettingsState=null,savedSettingsBytes=null;
 let pendingMigration=null,pendingImport=null,savedBytes=null,storageChanged=false;
-let settingsFrom='athlete',settingsDraft=[],restWarningWorkout=null,pendingAttemptVoice=null;
-let db=null,config=null,screen='boot',run=null,viewId=null,lastResultId=null,resultUntil=0,trainerUnlocked=false,returnFromHistory='athlete',returnFromPin=null,showAll=false,showAllPersonal=false,personalFlashTimer=null,voiceSerial=0,voicePending=0,voiceNow=null,voiceQueue=[],voiceWaiters=[],toastTimeout=null,renderError=null,restBypassedWorkout=null,wakeLock=null;
+let settingsFrom='athlete',settingsDraft=null,restWarningWorkout=null,pendingAttemptVoice=null;
+let db=null,config=null,screen='boot',run=null,viewId=null,lastResultId=null,resultUntil=0,trainerUnlocked=false,returnFromHistory='athlete',returnFromPin=null,personalFlashTimer=null,voiceSerial=0,voicePending=0,voiceNow=null,voiceQueue=[],voiceWaiters=[],toastTimeout=null,renderError=null,restBypassedWorkout=null,wakeLock=null;
+const expandedLists=new Set();
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const el=(tag,attrs='',body='')=>`<${tag} ${attrs}>${body}</${tag}>`;
 const b=(label,act,cl='',attrs='')=>`<button type="button" class="${cl}" data-act="${act}" ${attrs}>${label}</button>`;
@@ -20,6 +21,25 @@ const trainerMode=()=>['child','trainer'].includes(db.device.lastInterface);
 const settingsUnavailable=()=>trainerMode()||screen==='pin';
 const soundAvailable=()=>!renderError&&config?.audioPolicy==='user-controllable';
 const sound=()=>soundAvailable()&&db.device.soundEnabled;
+function beginSettingsDraft(){
+  settingsDraft={profileId:db.baseProfileId,name:athlete(db.baseProfileId).name,
+    attempts:db.device.soloPlannedAttempts===1?1:2,
+    mode:['test-intervals','stopwatch'].includes(db.device.soloMeasurementMode)?db.device.soloMeasurementMode:'intervals',
+    animation:db.device.launchAnimation,animationChanged:false};
+}
+function captureSettingsDraft(){
+  if(screen!=='settings'||!settingsDraft)return;
+  const name=$('profile-name');if(typeof name?.value==='string')settingsDraft.name=name.value;
+  const count=$('attempt-count');if(['1','2'].includes(count?.value))settingsDraft.attempts=Number(count.value);
+  const mode=$('mode-select');if(['intervals','test-intervals','stopwatch'].includes(mode?.value))settingsDraft.mode=mode.value;
+}
+function settingsHaveProfileName(){return db.device.lastInterface==='athlete'&&['history','athlete'].includes(settingsFrom);}
+function boundedList(items,key,{limit=5,total=items.length,attempts=false}={}){
+  const expanded=expandedLists.has(key);
+  const control=items.length>limit?b(expanded?(attempts?'5 попыток':'5 тренировок'):(attempts?`Все попытки (${total})`:`Все тренировки (${total})`),
+    'list-toggle','wide',`data-list-key="${esc(key)}" aria-expanded="${expanded}"`):'';
+  return {items:expanded?items:items.slice(0,limit),control};
+}
 function speakerIcon(enabled){
   const paths=enabled
     ?`<path d="M12 4.5 7.1 8.5H4.7A1.7 1.7 0 0 0 3 10.2v3.6a1.7 1.7 0 0 0 1.7 1.7h2.4l4.9 4z"/>
@@ -41,6 +61,7 @@ function commitState(next){
   M.validate(next);const bytes=JSON.stringify(next);localStorage.setItem(M.KEY,bytes);
   if(localStorage.getItem(M.KEY)!==bytes)throw Error('Не удалось подтвердить сохранение');
   savedBytes=bytes;db=next;
+  if(settingsDraft&&settingsDraft.profileId!==db.baseProfileId){settingsDraft.profileId=db.baseProfileId;settingsDraft.name=athlete(db.baseProfileId).name;}
 }
 function operate(action){if(pendingMigration||renderError)throw Error('Сначала завершите открытие данных');const r=action(db);commitState(r.state);return r.value;}
 function change(f){return operate(s=>M.mutation(s,f));}
@@ -178,8 +199,8 @@ function header(context='',actions='',homeLink=false,belowBrand='',showControls=
   return `<header class="app-head"><div>${brand}${context?`<div class="mode-tag">${esc(context)}</div>`:''}${belowBrand}</div>${controls}${actions?`<div class="toolbar header-actions">${actions}</div>`:''}</header>`;
 }
 function row(label,value){return `<div class="list-row"><span>${label}</span><strong>${value}</strong></div>`;}
-function soloPlannedAttempts(){return db.device.soloPlannedAttempts===1?1:2;}
-function soloMeasurementMode(){return ['test-intervals','stopwatch'].includes(db.device.soloMeasurementMode)?db.device.soloMeasurementMode:'intervals';}
+function soloPlannedAttempts(){return screen==='settings'&&settingsDraft?settingsDraft.attempts:db.device.soloPlannedAttempts===1?1:2;}
+function soloMeasurementMode(){return screen==='settings'&&settingsDraft?settingsDraft.mode:['test-intervals','stopwatch'].includes(db.device.soloMeasurementMode)?db.device.soloMeasurementMode:'intervals';}
 function chooseAttempts(count=2){return `<label for="attempt-count">Попыток в тренировке</label><select id="attempt-count"><option value="2" ${count===2?'selected':''}>2 попытки (по умолчанию)</option><option value="1" ${count===1?'selected':''}>1 попытка</option></select>`;}
 function chooseMode(mode=db.device.trainerMeasurementSelection||db.device.measurementMode){
   const t=trainerSettings();
@@ -218,7 +239,8 @@ function soloReady(){
 }
 function localDay(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
 function launchAnimation(){
-  if(['glow','pulse','none'].includes(db.device.launchAnimation))return db.device.launchAnimation;
+  const chosen=screen==='settings'&&settingsDraft?settingsDraft.animation:db.device.launchAnimation;
+  if(['glow','pulse','none'].includes(chosen))return chosen;
   return localDay()>(db.device.launchAnimationFirstDay||localDay())?'glow':'pulse';
 }
 function refreshLaunchAnimation(){
@@ -346,12 +368,12 @@ function progress(athleteId,child=false,separate=false){
   const points=M.renderChartData(db,athleteId);
   const summary=workoutSummary(athleteId,last,separate);
   const chart='<h2>Мой прогресс</h2><p class="note">Рабочий режим · среднее по лучшим попыткам тренировок</p>'+graphic(points,separate);
-  const workouts=historyItems(athleteId,child,separate);
+  const workouts=historyItems(athleteId,child,separate),archives=archiveHistory(athleteId);
   if(separate){
     const latest=card(summary+(last?workoutDetails(last,M.workingBest(db,last),true,true):''));
-    return (db.device.lastInterface==='athlete'?card(chart)+latest:latest+card(chart))+card(workouts);
+    return (db.device.lastInterface==='athlete'?card(chart)+latest:latest+card(chart))+card(workouts)+archives;
   }
-  return card(`${summary}<div class="progress-chart">${chart}</div>${workouts}`);
+  return card(`${summary}<div class="progress-chart">${chart}</div>${workouts}`)+archives;
 }
 
 function intervalDetails(a,sharedMax){if(a.mode!=='intervals'||!a.intervalsMs?.length)return '';const max=sharedMax??Math.max(...a.intervalsMs);return `<details><summary>Время каждого интервала (${a.intervalsMs.length})</summary><div class="stack">${a.intervalsMs.map((ms,i)=>`<div><div class="row between small"><span>Интервал ${i+1}</span><strong>${M.fmt(ms)}</strong></div><div style="height:8px;border-radius:4px;background:#0e2033;overflow:hidden"><div style="height:100%;background:#83def3;width:${(ms/Math.max(1,max)*100).toFixed(1)}%"></div></div></div>`).join('')}</div></details>`;}
@@ -398,16 +420,20 @@ function archiveHistory(aid){
   for(const a of db.archived.filter(a=>a.athleteId===aid))entries.push({date:a.date,id:a.id,
     html:`<div class="history-item"><span>${esc(a.date)} · Ручной ввод · </span><strong>${M.fmt(a.bestMs)}</strong></div>`});
   entries.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  return entries.length?'<h2>Архивные тренировки</h2>'+entries.map(x=>x.html).join(''):'';
+  const key=`archive:${db.device.lastInterface}:${aid}`,list=boundedList(entries,key);
+  return entries.length?card('<h2>Архивные тренировки</h2><div class="history-list" data-list-container="'+esc(key)+'">'+list.items.map(x=>x.html).join('')+list.control+'</div>','archive-history'):'';
 }
 function historyItems(aid,child=false,personal=false){
-  const ordered=[...M.publicWorkouts(db,aid)].reverse();
-  const completedCount=ordered.length;
+  const ordered=[...M.publicWorkouts(db,aid)].reverse(),total=ordered.length;
   if(personal)ordered.shift();
-  const limited=personal?!showAllPersonal:child&&!showAll;
   const personalView=personal&&db.device.lastInterface==='athlete';
-  const limit=personalView?4:5;
-  const show=limited?ordered.slice(0,limit):ordered;return `<h2>${personalView?'Предыдущие тренировки':'Тренировки'}</h2>${!ordered.length?muted(personal?'Нет предыдущих тренировок':'Нет завершённых тренировок'):''}<div class="history-list">${show.map(w=>{const bs=M.workingBest(db,w);return `<div class="history-item"><div class="row between"><span class="muted">${esc(M.date(w.createdAt))}</span><strong>${recordTime(bs,aid,M.completed(db,w).some(a=>isRecord(a)))}</strong></div>${workoutDetails(w,bs,personal,true)}</div>`;}).join('')}${personal&&ordered.length>limit?b(limited?`Все тренировки (${completedCount})`:'5 тренировок','personal-history-all','wide',`aria-expanded="${!limited}"`):''}</div>${archiveHistory(aid)}${!personal&&limited&&ordered.length>5?b('Вся история','history-all','wide'):''}`;}
+  const key=`history:${db.device.lastInterface}:${aid}`,list=boundedList(ordered,key,{limit:personal?4:5,total});
+  return `<h2>${personalView?'Предыдущие тренировки':'Тренировки'}</h2>${!ordered.length?muted(personal?'Нет предыдущих тренировок':'Нет завершённых тренировок'):''}
+    <div class="history-list" data-list-container="${esc(key)}">${list.items.map(w=>{
+      const bs=M.workingBest(db,w);
+      return `<div class="history-item"><div class="row between"><span class="muted">${esc(M.date(w.createdAt))}</span><strong>${recordTime(bs,aid,M.completed(db,w).some(a=>isRecord(a)))}</strong></div>${workoutDetails(w,bs,personal,true)}</div>`;
+    }).join('')}${list.control}</div>`;
+}
 function historyScreen(){
   const mode=db.device.lastInterface;
   const aid=mode==='child'||mode==='trainer'?db.device.viewAthleteId:currentAthlete();
@@ -419,14 +445,21 @@ function historyScreen(){
     athleteTabs(ids,selected,'history-profile')+profilePanel(selected,historyContent(selected,mode==='child',trainerUnlocked&&mode==='trainer'));
 }
 function historyContent(aid,child=false,trainer=false){
-  return `${progress(aid,child,true)}${trainer?interruptedAttempts(aid):''}${!child&&db.incomplete.some(a=>a.athleteId===aid)?card('<h2>Ранее неполные попытки</h2>'+db.incomplete.filter(a=>a.athleteId===aid).map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))} · не зачтена</span>${b('Удалить','delete-incomplete','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')):''}${trainer?adminHistory(aid):''}`;
+  return `${progress(aid,child,true)}${trainer?interruptedAttempts(aid):''}${!child?legacyIncompleteList(aid):''}${trainer?adminHistory(aid):''}`;
 }
 
 function interruptedAttempts(aid,nested=false){
-  const interrupt=db.attempts.filter(a=>a.athleteId===aid&&a.status==='interrupted');
-  const heading=nested?'h3':'h2';
-  const content=`<${heading}>Прерванные попытки</${heading}>${interrupt.length?interrupt.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))}</span>${b(nested?'Удалить попытку':'Удалить','delete-interrupted','danger small',`data-id="${esc(a.id)}"`)}</div>`).join(''):muted('Прерванных попыток нет')}`;
+  const interrupt=db.attempts.filter(a=>a.athleteId===aid&&a.status==='interrupted')
+    .sort((a,b)=>b.startedAt.localeCompare(a.startedAt)||b.id.localeCompare(a.id));
+  const heading=nested?'h3':'h2',key=`interrupted:${db.device.lastInterface}:${aid}`,list=boundedList(interrupt,key,{attempts:true});
+  const content=`<${heading}>Прерванные попытки</${heading}><div data-list-container="${esc(key)}">${interrupt.length?list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))}</span>${b('Удалить попытку','delete-interrupted','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')+list.control:muted('Прерванных попыток нет')}</div>`;
   return nested?content:card(content);
+}
+function legacyIncompleteList(aid){
+  const items=db.incomplete.filter(a=>a.athleteId===aid).sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt))||b.id.localeCompare(a.id));
+  if(!items.length)return '';
+  const key=`incomplete:${db.device.lastInterface}:${aid}`,list=boundedList(items,key,{attempts:true});
+  return card('<h2>Ранее неполные попытки</h2><div data-list-container="'+esc(key)+'">'+list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))} · не зачтена</span>${b('Удалить попытку','delete-incomplete','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')+list.control+'</div>');
 }
 function animationSettings(){
   const selected=launchAnimation();
@@ -435,26 +468,27 @@ function animationSettings(){
       `<label class="animation-option"><span class="animation-sample" aria-hidden="true"><span class="counter-ready launch-${value}"><span class="play-glyph"></span></span></span><span>${label}</span><input type="radio" name="launch-animation" value="${value}" ${value===selected?'checked':''}></label>`).join('')+'</div>');
 }
 function appSettings(){
+  if(!settingsDraft)beginSettingsDraft();
   const fromPersonalHistory=db.device.lastInterface==='athlete'&&['history','athlete'].includes(settingsFrom);
   return header()+
     '<h1 class="settings-title">Настройки</h1>'+
     (renderError?card(muted('Настройки недоступны, пока приложение не откроется.')):
     card('<h2>Тренировка</h2>'+chooseAttempts(soloPlannedAttempts())+chooseMode(soloMeasurementMode()))+
     animationSettings()+
-    (db.device.lastInterface==='athlete'?card('<h2>Название профиля</h2><label>Имя (указывается в файле выгрузки)<input id="profile-name" maxlength="50" value="'+esc(athlete(db.baseProfileId).name)+'"></label><div class="buttons">'+b('Сохранить имя','save-profile-name','wide')+'</div>'):'')+
+    (fromPersonalHistory?card('<h2>Название профиля</h2><label>Имя (указывается в файле выгрузки)<input id="profile-name" maxlength="50" value="'+esc(settingsDraft.name)+'"></label>'):'')+
     (fromPersonalHistory?
       card('<h2>Обменяться данными</h2><div class="buttons">'+b('Выгрузить','export-json','wide')+b('Загрузить','import-json','wide')+'</div><p class="note center">Данные хранятся на&nbsp;устройстве.</p><input type="file" id="file-import" accept=".json,application/json" hidden>')+
       archiveForm()+
       card('<h2 class="deletion-title">Выборочно удалить данные</h2>'+interruptedAttempts(currentAthlete(),true)+
         '<h3>Завершенные тренировки</h3>'+historyManagement(currentAthlete(),true)):''))+
-    `<div class="buttons">${b('Назад','settings-back','wide nav-return')}</div>`;
+    `<div class="buttons settings-actions">${b('Сохранить настройки','settings-save','primary wide')}${b('Не сохранять','settings-back','wide nav-return')}</div>`;
 }
 function archiveForm(options=''){
   return card('<h2>Добавить архивный результат</h2>'+
     (options?'<label>Спортсмен<select id="archive-athlete">'+options+'</select></label>':'')+
     '<p class="note">Ручной ввод. Не учитывается в рекорде, среднем и прогрессе.</p><label>Дата<input type="date" id="archive-date"></label>'+
     '<label>Время, секунды<input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label>'+
-    '<div class="buttons">'+b('Добавить в архив','add-archive','primary')+'</div>');
+    '<div class="buttons">'+b('Добавить в архив','add-archive',options?'primary wide':'primary')+'</div>');
 }
 function historyManagement(aid,completedOnly=false){
   const workouts=db.workouts.filter(w=>w.athleteId===aid&&(!completedOnly||w.status==='completed'));
@@ -483,8 +517,9 @@ function historyManagement(aid,completedOnly=false){
       ${b('Удалить тренировку','delete-archived','danger small',`data-id="${esc(a.id)}"`)}</div>
       ${content}</div>`});
   }
-  if(completedOnly)rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  return rows.map(row=>row.html).join('')||muted('Завершённых тренировок нет');
+  rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  const key=`manage:${db.device.lastInterface}:${aid}`,list=boundedList(rows,key);
+  return '<div data-list-container="'+esc(key)+'">'+(rows.length?list.items.map(row=>row.html).join('')+list.control:muted('Завершённых тренировок нет'))+'</div>';
 }
 function adminHistory(aid){return card('<h2>Управление историей</h2>'+historyManagement(aid));}
 function trainerAthleteRow(profile){
@@ -522,11 +557,11 @@ function setAthleteRenameOpen(row,open){
 }
 function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');const title=header('Тренер',b('К занятию','go-child','small'))+`<h1 class="hero-title">Управление занятием</h1>`;if(c)return title+card(`<h2>Занятие идёт</h2><p>${c.athleteIds.map(id=>esc(athlete(id).name)).join(' → ')}</p><p>Следующая попытка: ${c.nextIndex+1} из ${c.sequence.length}</p>${b('Вернуться к занятию','go-child','primary wide')}<div class="buttons">${b('Принудительно завершить','force-child','danger wide')}</div>`);
   if(additionalSolo())return title+card('<h2>Незавершённая тренировка</h2><p>'+esc(athlete(activeSolo().athleteId).name)+'</p>'+b('Продолжить незавершённую тренировку','resume-additional-solo','wide'));
-  return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(trainerAthleteRow).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div>`)+permanentTrainerSettings()+archiveForm(options)+card(`<h2>Резервные копии</h2><div class="buttons">${b('Экспорт JSON','export-json')} ${b('Импорт JSON','import-json')} ${b('Удалить все локальные данные','reset-all','danger')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
+  return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(trainerAthleteRow).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div>`)+permanentTrainerSettings()+archiveForm(options)+card(`<h2>Резервные копии</h2><div class="buttons backup-actions">${b('Выгрузить','export-json')} ${b('Загрузить','import-json')} ${b('Удалить все локальные данные','reset-all','danger wide')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function baseChoice(source,action,personal=false){return card('<h1>'+(personal?'Выберите профиль для загрузки':'Выберите базовый профиль')+'</h1><label>Профиль<select id="base-choice">'+source.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${source.workouts.filter(w=>w.athleteId===a.id).length} тренировок · ${source.archived.filter(w=>w.athleteId===a.id).length} архивных результатов</option>`).join('')+'</select></label><p>'+(personal?'Будет загружен только выбранный профиль.':'Этот профиль будет доступен без PIN.')+'</p>'+b(personal?'Загрузить профиль':'Назначить базовым',action,'primary wide'));}
 function pinScreen(){return header('','',false,'',false)+card(`<h2>Вход в интерфейс тренера</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного Тренером, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!trainerUnlocked&&!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer${db.device.lastInterface==='athlete'?' athlete-footer':''}"><span class="app-version">${db.device.lastInterface==='athlete'?'v. ':'sidesteps v. '}0.3.3-rc.6</span>${trainerUnlocked&&!renderError?(db.device.lastInterface==='athlete'?'':' <span aria-hidden="true">·</span> ')+ '<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
+function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const previousScreen=screen==='settings'?settingsFrom:screen;const showAdminLogin=!trainerUnlocked&&!['child','trainer'].includes(db.device.lastInterface)&&!renderError&&previousScreen!=='pin'&&previousScreen!=='trainer'&&db.device.lastInterface!=='trainer';app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.3-rc.7</span>${trainerUnlocked&&!renderError?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -534,7 +569,9 @@ function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class=
   }
   initializeProgressScroll();
 }
-function go(newScreen,lastInterface=null){if(lastInterface){change(n=>{n.device.lastInterface=lastInterface;});}
+function go(newScreen,lastInterface=null){
+  if(newScreen==='settings'){if(!settingsDraft)beginSettingsDraft();}else settingsDraft=null;
+  if(lastInterface){change(n=>{n.device.lastInterface=lastInterface;});}
   if(newScreen==='child-ready'){
     const c=M.currentChild(db),turn=M.nextTurn(db),w=M.workoutOf(db,turn?.workoutId);
     if(c?.athleteIds.length===1 && turn?.ordinal===2 && w?.firstEndedAt && restBypassedWorkout!==w.id && remainingRest(w)>0)newScreen='rest';
@@ -694,23 +731,34 @@ async function handleAction(name,button){try{
  }
  case 'settings':{
    if(settingsUnavailable())return;
-   settingsFrom=screen;
-   settingsDraft=['pin','trainer'].includes(screen)
-     ? Array.from(app.querySelectorAll('input[id]:not([type="file"]),select[id]'),field=>[field.id,field.value])
-     : [];
-   go('settings');
-   return;
+   settingsFrom=screen;beginSettingsDraft();go('settings');return;
+ }
+ case 'settings-save':{
+   if(screen!=='settings'||!settingsDraft||db.device.lastInterface!=='athlete')return;
+   captureSettingsDraft();const draft={...settingsDraft};
+   operate(s=>{
+     let candidate=s;
+     if(settingsHaveProfileName()){
+       if(draft.profileId!==s.baseProfileId)throw Error('Базовый профиль изменился. Откройте настройки заново.');
+       candidate=M.renameAthlete(s,s.baseProfileId,draft.name).state;
+     }
+     return M.mutation(candidate,n=>{
+       n.device.soloPlannedAttempts=draft.attempts;n.device.soloMeasurementMode=draft.mode;
+       if(draft.animationChanged)n.device.launchAnimation=draft.animation;
+     });
+   });
+   message('Настройки сохранены');go(settingsFrom);return;
  }
  case 'settings-back':{
-   const previous=settingsFrom;
-   const draft=settingsDraft;
-   settingsDraft=[];
-   go(previous);
-   for(const [id,value] of draft){
-     const field=$(id);
-     if(field)field.value=value;
-   }
-   app.querySelector('[data-act="settings"]')?.focus();
+   if(screen!=='settings')return;
+   go(settingsFrom);app.querySelector('[data-act="settings"]')?.focus();return;
+ }
+ case 'list-toggle':{
+   const key=button?.dataset.listKey;if(!key)return;
+   captureSettingsDraft();
+   if(expandedLists.has(key))expandedLists.delete(key);else expandedLists.add(key);
+   render();
+   Array.from(app.querySelectorAll?.('[data-act="list-toggle"]')||[]).find(node=>node.dataset.listKey===key)?.focus();
    return;
  }
  case 'toggle-sound':{
@@ -741,17 +789,15 @@ async function handleAction(name,button){try{
  case 'switch-athlete':{if(run){message('Сначала завершите измерение');return;}if(M.currentChild(db)||additionalSolo()){message('Сначала завершите текущую тренировку или занятие');return;}change(n=>{n.device.trainerActivated=false;n.device.selectedAthleteId=n.baseProfileId;n.device.lastInterface='athlete';});trainerUnlocked=false;go(activeSolo()?.firstEndedAt&&remainingRest(activeSolo())>0?'rest':activeSolo()?'athlete-ready':'athlete');return;}
  case 'go-child':{if(!trainerUnlocked||additionalSolo()||!db.device.childParticipants.length)return;change(n=>{n.device.lastInterface='child';});go(M.currentChild(db)?'child-ready':'child-final');return;}
  case 'open-exercise':if(M.currentChild(db))return;if(additionalSolo()){go(trainerUnlocked?'trainer':'pin');return;}go('athlete-ready');app.querySelector('[data-tap]')?.focus();return;
- case 'final-home':showAllPersonal=false;viewId=null;lastResultId=null;go('athlete');return;
+ case 'final-home':viewId=null;lastResultId=null;go('athlete');return;
  case 'resume-legacy':{if(db.device.activeWorkoutId||M.currentChild(db))return;const wid=button.dataset.id;const w=M.workoutOf(db,wid);if(!w||w.status!=='legacy_pending'||w.athleteId!==currentAthlete())return;change(n=>{n.device.activeWorkoutId=wid;});go('athlete-ready');return;}
  case 'start-child':{if(!trainerUnlocked||screen!=='trainer')return;const a=$('trainer-a').value,bb=$('trainer-b').value,ids=bb?[a,bb]:[a],count=Number($('attempt-count').value);const plan=M.measurementPlan($('mode-select').value,trainerSettings());lockWorkingCount(plan);operate(s=>{const result=M.startChild(s,ids,count,plan);result.state.device.measurementMode=plan.mode;return result;});go('child-ready');queueVoice(athlete(ids[0]).name);return;}
  case 'force-child':{if(!trainerUnlocked||(!run&&!window.confirm('Завершить занятие, сохранив выполненные попытки?')))return;await handleAction('end-training');return;}
  case 'rest-early':if(screen==='result'||screen==='rest'||screen==='child-ready'){const c=M.currentChild(db);const w=c?M.workoutOf(db,M.nextTurn(db)?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);restBypassedWorkout=w?.id||null;screen=c?'child-ready':'athlete-ready';resetVoice();render();}return;
  case 'history-athlete':returnFromHistory=screen;go('history');return;
  case 'history-child':returnFromHistory=screen;go('history');return;
- case 'personal-history-all':showAllPersonal=!showAllPersonal;render();app.querySelector('[data-act="personal-history-all"]')?.focus();return;
- case 'history-all':showAll=true;render();return;
- case 'back-history':showAll=false;go(returnFromHistory==='trainer'?'trainer':isChild()?'child-final':returnFromHistory);return;
- case 'history-profile':{const ids=trainerUnlocked&&db.device.lastInterface==='trainer'?db.athletes.map(a=>a.id):db.device.childParticipants;const aid=button.dataset.id;if(!ids.includes(aid))return;change(n=>{n.device.viewAthleteId=aid;});showAllPersonal=false;render();app.querySelector('[role="tab"][aria-selected="true"]')?.focus();return;}
+ case 'back-history':go(returnFromHistory==='trainer'?'trainer':isChild()?'child-final':returnFromHistory);return;
+ case 'history-profile':{const ids=trainerUnlocked&&db.device.lastInterface==='trainer'?db.athletes.map(a=>a.id):db.device.childParticipants;const aid=button.dataset.id;if(!ids.includes(aid))return;change(n=>{n.device.viewAthleteId=aid;});render();app.querySelector('[role="tab"][aria-selected="true"]')?.focus();return;}
  case 'child-view':{if(M.currentChild(db))return;let aid=button.dataset.id;if(!db.device.childParticipants.includes(aid))return;change(n=>{n.device.viewAthleteId=aid;});go('child-final');app.querySelector('[role="tab"][aria-selected="true"]')?.focus();return;}
  case 'trainer-history':{if(!trainerUnlocked)return;const aid=button.dataset.id;change(n=>{n.device.viewAthleteId=aid;});returnFromHistory='trainer';go('history');return;}
  case 'add-archive':{
@@ -772,11 +818,6 @@ async function handleAction(name,button){try{
      testIntervalCount:Number($('test-count').value),workRestDurationSec:Number($('work-rest').value),testRestDurationSec:Number($('test-rest').value)};
    writeTrainerSettings(M.changeTrainerSettings(t,patch,trainerUnlocked));
    message('Настройки сохранены');render();return;
- }
- case 'save-profile-name':{
-   if(screen!=='settings'||db.device.lastInterface!=='athlete'||renderError||run)return;
-   operate(s=>M.renameAthlete(s,s.baseProfileId,$('profile-name').value));
-   message('Имя сохранено');render();return;
  }
  case 'rename-athlete':
  case 'cancel-athlete-rename':{
@@ -939,20 +980,21 @@ app.addEventListener('submit',e=>{
     setAthleteRenameOpen(row,false);
   }catch(err){fail(err);}
 });
+app.addEventListener('input',e=>{if(screen==='settings'&&settingsDraft&&e.target.id==='profile-name')settingsDraft.name=e.target.value;});
 app.addEventListener('change',e=>{
   const {id,value}=e.target;
   try{
     if(screen==='settings'&&e.target.name==='launch-animation'){
-      if(['glow','pulse','none'].includes(value))change(n=>{n.device.launchAnimation=value;});
+      if(!settingsDraft)beginSettingsDraft();
+      if(['glow','pulse','none'].includes(value)){settingsDraft.animation=value;settingsDraft.animationChanged=true;}
     }else if(screen==='settings'&&id==='attempt-count'){
-      change(n=>{n.device.soloPlannedAttempts=Number(value);});
+      if(!settingsDraft)beginSettingsDraft();
+      if(['1','2'].includes(value))settingsDraft.attempts=Number(value);
     }else if(id==='mode-select'){
       if(screen!=='settings'&&!(trainerUnlocked&&screen==='trainer'))return;
       if(!['intervals','test-intervals','stopwatch'].includes(value))return;
-      change(n=>{
-        if(screen==='settings')n.device.soloMeasurementMode=value;
-        else{n.device.measurementMode=value;n.device.trainerMeasurementSelection=value;}
-      });
+      if(screen==='settings'){if(!settingsDraft)beginSettingsDraft();settingsDraft.mode=value;}
+      else change(n=>{n.device.measurementMode=value;n.device.trainerMeasurementSelection=value;});
     }else if(id==='file-import'){
       importFile(e.target.files[0]);
     }

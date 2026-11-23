@@ -151,7 +151,7 @@ test('trainer exit is a link and returns to athlete history',async()=>{
   for(const screen of ['trainer','athlete','history']){
     f.api.setScreen(screen);f.api.render();
     const html=f.app.innerHTML;
-    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span> <span aria-hidden="true">·<\/span> <a href="#exit" data-act="switch-athlete">Интерфейс спортсмена<\/a>/);
+    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span><a href="#exit" data-act="switch-athlete">Интерфейс спортсмена<\/a>/);
     assert.equal((html.match(/data-act="switch-athlete"/g)||[]).length,1);
     assert.doesNotMatch(html,/<header[\s\S]*data-act="switch-athlete"[\s\S]*<\/header>/);
     assert.doesNotMatch(html,/Мои упражнения/);
@@ -346,11 +346,14 @@ test('animation settings follow training and show three live radio samples',()=>
   assert.equal((html.match(/class="animation-sample"/g)||[]).length,3);
   assert.match(html,/value="pulse" checked/);
 });
-for(const value of ['glow','pulse','none'])test(`animation selection ${value} applies in both measurement modes and on coach device`,()=>{
+for(const value of ['glow','pulse','none'])test(`animation selection ${value} applies after save in both modes and on coach device`,async()=>{
   for(const child of [false,true])for(const mode of ['intervals','stopwatch']){
-    const f=readyFixture(mode,{child});f.api.setScreen('settings');f.chooseAnimation(value);
-    assert.equal(f.api.state().device.launchAnimation,value);
+    const f=readyFixture(mode,{child});const previous=f.api.state().device.lastInterface;
+    f.api.state().device.lastInterface='athlete';f.api.setScreen('settings');f.chooseAnimation(value);
+    assert.notEqual(f.api.state().device.launchAnimation,value);
     f.api.render();assert.ok(f.app.innerHTML.includes(`value="${value}" checked`));
+    await f.api.handleAction('settings-save');assert.equal(f.api.state().device.launchAnimation,value);
+    f.api.state().device.lastInterface=previous;
     f.api.setScreen(child?'child-ready':'athlete-ready');f.api.render();
     assert.ok(f.app.innerHTML.includes(`counter counter-ready launch-${value}`));
   }

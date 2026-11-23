@@ -5,7 +5,7 @@ async function page(initial={},options={}){
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
  const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
  const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
- const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
+ const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,archiveHistory,historyItems,historyManagement,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
  window:browser,document:{getElementById:k=>k==='app'?app:k==='toast'?{style:{},set textContent(v){messages.push(v);}}:nodes[k],addEventListener(){}},
  localStorage:store,fetch:async()=>({ok:true,json:async()=>({...require('../config.json'),trainerAccess:options.noPin?null:require('../config.json').trainerAccess})}),
@@ -81,7 +81,7 @@ test('personal profile rename preserves identity and history in export and reloa
   await p.api.handleAction('settings');
   assert.match(p.html(),/Тренировка[\s\S]*Название профиля[\s\S]*Обменяться данными/);
   p.nodes['profile-name']={value:'  Моё имя  '};
-  await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
+  await p.api.handleAction('settings-save',{dataset:{id:s.athletes[1].id}});
   const out=p.api.exportSnapshot();
   assert.equal(out.athletes[0].id,s.baseProfileId);
   assert.equal(out.athletes[0].name,'Моё имя');
@@ -98,7 +98,7 @@ test('personal profile rename rejects invalid input and failed writes atomically
     const before=p.data.get(M.KEY);
     p.nodes['profile-name']={value};
     if(value==='Новое имя')p.failWrite();
-    await p.api.handleAction('save-profile-name');
+    await p.api.handleAction('settings-save');
     assert.equal(p.data.get(M.KEY),before);
     assert.equal(p.api.state().athletes[0].name,'Спортсмен');
   }
@@ -161,4 +161,97 @@ test('existing installations preserve the accepted work count 20 and settings ch
   assert.equal(p.api.settings().workingIntervalCount,20);assert.equal(p.api.settings().workingCountLocked,true);
   p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
   assert.deepEqual(p.api.state().workouts[0].measurementPlan,r.state.workouts[0].measurementPlan);
+});
+
+function longListsState(){
+  let s=M.blank();
+  for(let i=0;i<7;i++){
+    const w=M.startSolo(s,s.baseProfileId,1),a=M.startAttempt(w.state,w.value.id,'intervals',20);
+    s=M.finishAttempt(a.state,a.value.id,1000+i*100,Array(20).fill(50+i*5)).state;
+    s.workouts.at(-1).createdAt=`2026-11-${String(i+1).padStart(2,'0')}T12:00:00.000Z`;
+    s=M.addArchived(s,s.baseProfileId,`2026-10-${String(i+1).padStart(2,'0')}`,2000+i*100).state;
+  }
+  const pending=M.startSolo(s,s.baseProfileId,1);s=pending.state;
+  for(let i=0;i<7;i++){
+    const a=M.startAttempt(s,pending.value.id,'intervals',20,`2026-11-${String(i+1).padStart(2,'0')}T13:00:00.000Z`);
+    s=M.interruptAttempt(a.state,a.value.id).state;
+  }
+  return M.endWorkout(s,pending.value.id).state;
+}
+test('settings draft saves profile and parameters together and cancellation writes nothing',async()=>{
+  const p=await page();await p.api.handleAction('settings');
+  const before=p.data.get(M.KEY);
+  p.appEvents.change({target:{id:'attempt-count',value:'1'}});
+  p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
+  p.appEvents.change({target:{name:'launch-animation',value:'none'}});
+  p.appEvents.input({target:{id:'profile-name',value:'Новое имя'}});
+  assert.equal(p.data.get(M.KEY),before);
+  await p.api.handleAction('settings-back');
+  assert.equal(p.data.get(M.KEY),before);
+  await p.api.handleAction('settings');
+  assert.match(p.html(),/value="Спортсмен"/);
+  p.appEvents.change({target:{id:'attempt-count',value:'1'}});
+  p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
+  p.appEvents.change({target:{name:'launch-animation',value:'none'}});
+  p.appEvents.input({target:{id:'profile-name',value:'Новое имя'}});
+  await p.api.handleAction('settings-save');
+  const saved=p.api.state();
+  assert.equal(saved.athletes[0].name,'Новое имя');assert.equal(saved.device.soloPlannedAttempts,1);
+  assert.equal(saved.device.soloMeasurementMode,'stopwatch');assert.equal(saved.device.launchAnimation,'none');
+  assert.equal(p.api.screen(),'athlete');
+});
+test('invalid name and failed write cannot partially apply settings',async()=>{
+  for(const quota of [false,true]){
+    const p=await page();await p.api.handleAction('settings');const before=p.data.get(M.KEY);
+    p.appEvents.change({target:{id:'attempt-count',value:'1'}});
+    p.appEvents.input({target:{id:'profile-name',value:quota?'Новое имя':''}});
+    if(quota)p.failWrite();
+    await p.api.handleAction('settings-save');
+    assert.equal(p.data.get(M.KEY),before);assert.equal(p.api.state().device.soloPlannedAttempts,2);
+    assert.equal(p.api.screen(),'settings');
+  }
+});
+test('archive, management, history and interrupted lists expand independently and retain state after deletion',async()=>{
+  const s=longListsState(),p=await page({[M.KEY]:JSON.stringify(s)}),aid=s.baseProfileId;
+  const count=(html,pattern)=>(html.match(pattern)||[]).length;
+  assert.equal(count(p.api.archiveHistory(aid),/class="history-item"/g),5);
+  assert.equal(count(p.api.historyItems(aid,false,true),/class="history-item"/g),4);
+  assert.equal(count(p.api.interruptedAttempts(aid,true),/data-act="delete-interrupted"/g),5);
+  assert.equal(count(p.api.historyManagement(aid,true),/data-history-(?:workout|archive)=/g),5);
+  for(const key of [`archive:athlete:${aid}`,`manage:athlete:${aid}`,`interrupted:athlete:${aid}`]){
+    await p.api.handleAction('list-toggle',{dataset:{listKey:key}});
+  }
+  assert.equal(count(p.api.archiveHistory(aid),/class="history-item"/g),7);
+  assert.equal(count(p.api.historyManagement(aid,true),/data-history-(?:workout|archive)=/g),14);
+  assert.equal(count(p.api.interruptedAttempts(aid,true),/data-act="delete-interrupted"/g),7);
+  assert.equal(count(p.api.historyItems(aid,false,true),/class="history-item"/g),4);
+  await p.api.handleAction('settings');
+  p.appEvents.input({target:{id:'profile-name',value:'Не сохранять это имя'}});
+  await p.api.handleAction('delete-archived',{dataset:{id:s.archived[0].id}});
+  await p.api.handleAction('settings-back');
+  assert.equal(p.api.state().archived.length,6);assert.equal(p.api.state().athletes[0].name,'Спортсмен');
+  assert.equal(count(p.api.archiveHistory(aid),/class="history-item"/g),6);
+  assert.equal(p.api.expanded(`archive:athlete:${aid}`),true);
+  await p.api.handleAction('list-toggle',{dataset:{listKey:`archive:athlete:${aid}`}});
+  assert.equal(count(p.api.archiveHistory(aid),/class="history-item"/g),5);
+});
+test('draft survives list toggles and saving uses current history after explicit archive insertion',async()=>{
+  const s=longListsState(),p=await page({[M.KEY]:JSON.stringify(s)});await p.api.handleAction('settings');
+  p.appEvents.input({target:{id:'profile-name',value:'Имя после сохранения'}});
+  await p.api.handleAction('list-toggle',{dataset:{listKey:`manage:athlete:${s.baseProfileId}`}});
+  assert.match(p.html(),/value="Имя после сохранения"/);
+  p.nodes['archive-date']={value:'2026-11-20'};p.nodes['archive-time']={value:'3,123'};
+  await p.api.handleAction('add-archive');
+  await p.api.handleAction('settings-save');
+  assert.equal(p.api.state().archived.length,8);assert.equal(p.api.state().archived.at(-1).bestMs,3123);
+  assert.equal(p.api.state().athletes[0].name,'Имя после сохранения');
+});
+test('settings opened from a new workout omit the profile name and preserve its frozen plan',async()=>{
+  const plan=M.measurementPlan('intervals',M.defaultTrainerSettings(require('../config.json'),false));
+  const r=M.startSolo(M.blank(),'athlete-default',2,plan),p=await page({[M.KEY]:JSON.stringify(r.state)});
+  await p.api.handleAction('settings');assert.doesNotMatch(p.html(),/Название профиля|profile-name/);
+  p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
+  await p.api.handleAction('settings-save');
+  assert.deepEqual(p.api.state().workouts[0].measurementPlan,plan);
+  assert.equal(p.api.state().device.soloMeasurementMode,'stopwatch');
 });

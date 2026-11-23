@@ -55,7 +55,7 @@ def new_exercise(page, attempts=None, mode=None):
             page.locator('#attempt-count').select_option(str(attempts))
         if mode is not None:
             page.locator('#mode-select').select_option(mode)
-        page.get_by_role('button',name='Назад из настроек',exact=True).click()
+        page.get_by_role('button',name='Сохранить настройки',exact=True).click()
     page.get_by_role('tab',name='Новая тренировка').click()
 
 def test_adult(browser):
@@ -67,14 +67,14 @@ def test_adult(browser):
     assert not json.loads(state['interval-lab:data:v6'])['workouts']
 
     page.get_by_role('button',name='Настройки',exact=True).click()
-    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка','Анимация запуска','Название профиля']
+    assert page.locator('.panel > h2:first-child').all_text_contents()==['Тренировка','Анимация запуска']
     assert page.get_by_role('button',name='Звук',exact=True).is_visible()
     mode=page.locator('#mode-select')
     assert mode.input_value()=='intervals'
     assert mode.locator('option:checked').inner_text()=='1 отсечка'
     page.locator('#attempt-count').select_option('1')
     mode.select_option('stopwatch')
-    page.get_by_role('button',name='Назад из настроек',exact=True).click()
+    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.locator('.play-glyph').is_visible()
 
@@ -89,7 +89,7 @@ def test_adult(browser):
     assert page.locator('#attempt-count').input_value()=='2'
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Назад из настроек',exact=True).click()
+    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.locator('.play-glyph').is_visible()
     tap(page);tap(page)
