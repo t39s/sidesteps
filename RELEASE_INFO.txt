@@ -1,7 +1,7 @@
-sidesteps v0.3.1
+sidesteps v0.3.2-rc.1
 Release date: 2026-11-23
-Status: STABLE — accepted by owner 2026-11-23
-Branch: main
-Stable baseline: v0.3.0, main 16075d019424c57e7392e56678d6881fbff0e981
+Status: RELEASE CANDIDATE — owner acceptance pending
+Branch: develop
+Stable baseline: v0.3.1, main d60fa87b11f447df4664158e6e2002f4fe6524ba
 Training preset: 20 intervals, rest 120 seconds, minimum tap gap 500 ms.
-Changes: interface labels, version display, bounded CI checks and verified artifact publication.
+Changes: browser CI uses preinstalled Google Chrome and runner system libraries.
