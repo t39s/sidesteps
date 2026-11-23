@@ -4,7 +4,9 @@ const aid='athlete-default';
 const chunks=(ms,n)=>Array.from({length:n},(_,i)=>Math.floor(ms/n)+(i<ms%n?1:0));
 function workout(state,mode,target,times,plan=null){
   const w=M.startSolo(state,aid,times.length,plan);state=w.state;
-  for(const ms of times){const a=M.startAttempt(state,w.value.id,mode,target);state=M.finishAttempt(a.state,a.value.id,ms,mode==='intervals'?chunks(ms,target):[]).state;}
+  let clock=Date.UTC(2026,10,1)+state.workouts.length*1000000;
+  w.value.createdAt=new Date(clock).toISOString();
+  for(const ms of times){const a=M.startAttempt(state,w.value.id,mode,target,new Date(clock).toISOString());state=M.finishAttempt(a.state,a.value.id,ms,mode==='intervals'?chunks(ms,target):[],new Date(clock+ms).toISOString()).state;clock+=ms+1000;}
   return {state,w:M.workoutOf(state,w.value.id)};
 }
 test('trainer defaults are separate, existing installations fix 20 and fresh setups permit one choice',()=>{
