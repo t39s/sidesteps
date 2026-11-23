@@ -148,9 +148,108 @@ def test_http_pwa(browser):
         assert state(p)['schemaVersion']==6
         assert not errors,errors
     finally:context.close();server.shutdown()
+
+def test_personal_data_management(browser):
+    seed, errors = make_page(browser)
+    raw = seed.evaluate("""() => {
+      const M=window.ILModel;
+      let s=M.addAthlete(M.blank(),'Другой профиль').state;
+      for (const aid of s.athletes.map(a=>a.id)) {
+        const count=aid===s.baseProfileId?2:1;
+        let workout=M.startSolo(s,aid,count);s=workout.state;
+        for(let i=0;i<count;i++) {
+          let attempt=M.startAttempt(s,workout.value.id,'stopwatch',1);
+          s=M.finishAttempt(attempt.state,attempt.value.id,2000+i*1000,[]).state;
+        }
+      }
+      s=M.addArchived(s,s.baseProfileId,'2026-11-01',1500).state;
+      return JSON.stringify(s);
+    }""")
+    seed.close()
+    original=json.loads(raw)
+    aid=original['baseProfileId']
+    own=next(w for w in original['workouts'] if w['athleteId']==aid)
+    other=next(w for w in original['workouts'] if w['athleteId']!=aid)
+    p, errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
+    p.get_by_role('button',name='Настройки',exact=True).click()
+    headings=p.locator('.panel > h2').all_text_contents()
+    assert headings==['Тренировка','Анимация запуска','Обменяться данными',
+                      'Добавить архивный результат','Выборочно удалить данные'],headings
+    assert p.get_by_role('button',name='Выгрузить',exact=True).is_visible()
+    assert p.locator(f'[data-history-workout="{other["id"]}"]').count()==0
+    workout=p.locator(f'[data-history-workout="{own["id"]}"]')
+    workout.locator('summary').click()
+    assert workout.get_by_role('button',name='Удалить попытку',exact=True).count()==2
+    before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
+    p.once('dialog',lambda dialog:dialog.dismiss())
+    workout.get_by_role('button',name='Удалить попытку',exact=True).first.click()
+    assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
+    p.once('dialog',lambda dialog:dialog.accept())
+    workout.get_by_role('button',name='Удалить попытку',exact=True).first.click()
+    assert len(next(w for w in state(p)['workouts'] if w['id']==own['id'])['attemptIds'])==1
+    workout.locator('summary').click()
+    def accept_last(dialog):
+        assert 'последнюю' in dialog.message
+        assert 'комментариями' in dialog.message
+        dialog.accept()
+    p.once('dialog',accept_last)
+    workout.get_by_role('button',name='Удалить попытку',exact=True).click()
+    assert all(w['id']!=own['id'] for w in state(p)['workouts'])
+    assert next(w for w in state(p)['workouts'] if w['id']==other['id'])==other
+    p.locator('#archive-date').fill('2026-11-02')
+    p.locator('#archive-time').fill('12,345')
+    p.get_by_role('button',name='Добавить в архив',exact=True).click()
+    assert state(p)['archived'][-1]['athleteId']==aid
+    assert state(p)['archived'][-1]['bestMs']==12345
+    assert p.locator('[data-history-archive]').count()==2
+    assert not state(p)['device']['trainerActivated']
+    assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
+    saved=p.evaluate('window.__dump()')
+    p.close()
+    q, errs2=make_page(browser,saved,viewport_width=375,mobile=True)
+    assert len(state(q)['workouts'])==1
+    trainer(q)
+    q.locator(f'[data-act="trainer-history"][data-id="{other["athleteId"]}"]').click()
+    history=q.locator(f'[data-history-workout="{other["id"]}"]')
+    history.locator('summary').click()
+    assert history.get_by_role('button',name='Удалить попытку',exact=True).count()==1
+    assert not errors+errs+errs2,errors+errs+errs2
+    q.close()
+
+def test_personal_profile_selection(browser):
+    seed, errors=make_page(browser)
+    raw=seed.evaluate("""()=>{
+      const M=window.ILModel;
+      const s=M.addAthlete(M.blank(),'Выбранный профиль').state;
+      return JSON.stringify(M.addArchived(s,s.athletes[1].id,'2026-11-01',12345).state);
+    }""")
+    seed.close()
+    p,errs=make_page(browser,viewport_width=375,mobile=True)
+    p.get_by_role('button',name='Настройки',exact=True).click()
+    before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
+    p.locator('#file-import').set_input_files({
+        'name':'profiles.json','mimeType':'application/json','buffer':raw.encode()})
+    p.get_by_role('heading',name='Выберите профиль для загрузки').wait_for()
+    assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
+    p.get_by_role('button',name='Отмена',exact=True).click()
+    assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
+    p.locator('#file-import').set_input_files({
+        'name':'profiles.json','mimeType':'application/json','buffer':raw.encode()})
+    selected=json.loads(raw)['athletes'][1]['id']
+    p.locator('#base-choice').select_option(selected)
+    p.get_by_role('button',name='Загрузить профиль',exact=True).click()
+    p.get_by_role('heading',name='Настройки',exact=True).wait_for()
+    assert state(p)['baseProfileId']==selected
+    assert len(state(p)['athletes'])==1
+    assert len(state(p)['archived'])==1
+    assert p.get_by_role('link',name='Интерфейс тренера',exact=True).is_visible()
+    assert not state(p)['device']['trainerActivated']
+    assert not errors+errs,errors+errs
+    p.close()
+
 if __name__=='__main__':
     with sync_playwright() as p:
         b=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_EXECUTABLE','/usr/bin/chromium') or None,headless=True,args=['--no-sandbox'])
-        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa]:
+        for check in [test_migration,test_deleted_session_migration,test_profiles,test_http_pwa,test_personal_data_management,test_personal_profile_selection]:
             check(b);print('PASS',check.__name__,flush=True)
         b.close()

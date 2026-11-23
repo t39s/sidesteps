@@ -75,3 +75,82 @@ test('comment archive round trip treats empty and absent equally but rejects tex
   exported.workouts[0].trainerComment=42;
   assert.throws(()=>M.evaluateImport(s,exported),/Некорректный комментарий/);
 });
+
+function completedPair(){
+  let s=M.addAthlete(M.blank(),'Другой').state;
+  s=M.startChild(s,s.athletes.map(a=>a.id),2).state;
+  for(let i=0;i<4;i++){
+    const turn=M.nextTurn(s);
+    const start=M.startAttempt(s,turn.workoutId,'stopwatch',1);
+    s=M.finishAttempt(start.state,start.value.id,1000+i*100,[]).state;
+  }
+  return s;
+}
+test('personal deletion is scoped by record identity and preserves other participant',()=>{
+  const s=completedPair(),aid=s.baseProfileId,other=s.athletes[1].id;
+  const before=JSON.stringify(s),own=s.workouts.find(w=>w.athleteId===aid);
+  const foreign=s.workouts.find(w=>w.athleteId===other);
+  for(const [type,id] of [['workout',foreign.id],['attempt',foreign.attemptIds[0]]]){
+    assert.throws(()=>M.deleteRecord(s,type,id,false),/базовый профиль/);
+    assert.equal(JSON.stringify(s),before);
+  }
+  let n=M.deleteRecord(s,'attempt',own.attemptIds[0],false).state;
+  assert.equal(M.completed(n,M.workoutOf(n,own.id)).length,1);
+  n=M.deleteRecord(n,'attempt',own.attemptIds[1],false).state;
+  assert.equal(n.workouts.length,1);
+  assert.deepEqual(n.attempts,s.attempts.filter(a=>a.athleteId===other));
+  assert.equal(n.childSessions[0].athleteIds[0],other);
+  M.validate(n);
+});
+test('personal deletion blocks unfinished workouts and active sessions',()=>{
+  let s=M.startSolo(M.blank(),'athlete-default',2).state;
+  const w=s.workouts[0],start=M.startAttempt(s,w.id,'stopwatch',1);
+  s=M.finishAttempt(start.state,start.value.id,1200,[]).state;
+  for(const type of ['attempt','workout']){
+    assert.throws(()=>M.deleteRecord(s,type,type==='attempt'?start.value.id:w.id,false),/завершите тренировку/);
+  }
+  const active=M.startChild(M.blank(),['athlete-default'],1).state;
+  assert.throws(()=>M.deleteRecord(active,'workout',active.workouts[0].id,false),/Завершите занятие/);
+});
+test('last completed deletion also removes linked interrupted attempts consistently',()=>{
+  let s=M.startSolo(M.blank(),'athlete-default',2).state;
+  const wid=s.workouts[0].id;
+  let a=M.startAttempt(s,wid,'stopwatch',1);s=M.interruptAttempt(a.state,a.value.id).state;
+  a=M.startAttempt(s,wid,'stopwatch',1);s=M.finishAttempt(a.state,a.value.id,1000,[]).state;
+  s=M.endWorkout(s,wid).state;
+  const n=M.deleteRecord(s,'attempt',a.value.id,false).state;
+  assert.equal(n.attempts.length,0);assert.equal(n.workouts.length,0);M.validate(n);
+});
+test('personal archive and incomplete deletion reject foreign records',()=>{
+  let s=M.addAthlete(M.blank(),'Другой').state;
+  s=M.addArchived(s,s.athletes[1].id,'2026-11-01',3000).state;
+  assert.throws(()=>M.deleteRecord(s,'archived',s.archived[0].id,false),/базовый профиль/);
+  s.incomplete=[{id:'incomplete-other',athleteId:s.athletes[1].id}];
+  assert.throws(()=>M.deleteRecord(s,'incomplete','incomplete-other',false),/базовый профиль/);
+  const own=M.addArchived(s,s.baseProfileId,'2026-11-02',2000);
+  const n=M.deleteRecord(own.state,'archived',own.value.id,false).state;
+  assert.deepEqual(n.archived,s.archived);
+});
+test('selected profile export/import preserves identities and scoped session history',()=>{
+  const s=completedPair(),before=JSON.stringify(s);
+  for(const aid of s.athletes.map(a=>a.id)){
+    const out=M.selectProfile(s,aid);
+    assert.equal(out.athletes.length,1);
+    assert.deepEqual(out.attempts,s.attempts.filter(a=>a.athleteId===aid));
+    assert.deepEqual(out.childSessions[0].athleteIds,[aid]);
+    assert.equal(out.childSessions[0].sequence.length,2);
+    M.validate(out);
+    const fresh=M.evaluatePersonalImport(M.blank(),s,aid).state;
+    assert.equal(fresh.baseProfileId,aid);
+    assert.equal(fresh.athletes.length,1);
+    assert.equal(fresh.device.trainerActivated,false);
+    M.validate(fresh);
+    if(aid===s.baseProfileId){
+      const reloaded=M.evaluatePersonalImport(s,out,aid).state;
+      for(const field of fields)assert.deepEqual(reloaded[field],s[field]);
+      const conflict=M.clone(out);conflict.workouts[0].trainerComment='Изменение';
+      assert.throws(()=>M.evaluatePersonalImport(s,conflict,aid),/Конфликт/);
+    }else assert.throws(()=>M.evaluatePersonalImport(s,out,aid),/базовый профиль/);
+  }
+  assert.equal(JSON.stringify(s),before);
+});
