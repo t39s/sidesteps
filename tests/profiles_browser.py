@@ -28,7 +28,7 @@ def test_migration(browser):
     data=p.evaluate('window.__dump()');p.close()
     q,e=make_page(browser,data)
     assert state(q)['baseProfileId']==old['athletes'][1]['id']
-    assert q.get_by_role('heading',name='Вход тренера').is_visible()
+    assert q.get_by_role('heading',name='Вход в интерфейс тренера').is_visible()
     assert not errors+e,errors+e
     q.close()
 def test_deleted_session_migration(browser):

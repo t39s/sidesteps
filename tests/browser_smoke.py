@@ -248,7 +248,7 @@ def test_trainer_relocked_on_reload(browser):
     trainer(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data)
-    restored.get_by_role('heading',name='Вход тренера').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Вход в интерфейс тренера').wait_for(timeout=5000)
     assert 'Управление занятием' not in restored.locator('body').inner_text()
     assert not errs+errs2,errs+errs2
     restored.close()

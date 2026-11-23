@@ -146,7 +146,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert footer.inner_text()=='sidesteps v. 0.3.1-rc.5 · Интерфейс тренера'
+        assert footer.inner_text()=='sidesteps v. 0.3.1-rc.6 · Интерфейс тренера'
         assert login.get_attribute('title')=='Для Тренера'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
@@ -155,7 +155,7 @@ def test_history_chart_portrait(browser):
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
-        q.get_by_role('heading',name='Вход тренера').wait_for()
+        q.get_by_role('heading',name='Вход в интерфейс тренера').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
         assert history.get_attribute('aria-selected')=='true'
