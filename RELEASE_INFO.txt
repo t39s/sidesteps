@@ -1,6 +1,6 @@
-sidesteps v0.3.0-rc.5
-Release date: 2026-11-20
-Status: RELEASE CANDIDATE — owner acceptance pending
-Branch: develop
+sidesteps v0.3.0
+Release date: 2026-11-23
+Status: STABLE — accepted by owner 2026-11-23
+Branch: main
 Stable baseline: v0.2.11, main 95a311973f4eec2a77b751f9b0991cfe780d8bb4
 Preview training preset: 20 intervals, rest 120 seconds, minimum tap gap 500 ms.
