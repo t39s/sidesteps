@@ -279,7 +279,7 @@ def test_modes_settings_and_statistics(browser):
     new_exercise(p,attempts=1,mode='test-intervals')
     assert p.get_by_text('Тестовый режим · результат сохранится в архив',exact=True).is_visible()
     for _ in range(4):tap(p)
-    assert p.get_by_text('Тестовый результат · сохранён в архив',exact=True).is_visible()
+    p.get_by_text('Тестовый результат · сохранён в архив',exact=True).wait_for(timeout=2000)
     assert p.get_by_text('★ Новый рекорд!',exact=True).count()==0
     p.get_by_role('heading',name='Тренировка завершена',exact=True).wait_for(timeout=6500)
     assert p.get_by_role('heading',name='Мой прогресс',exact=True).count()==0
