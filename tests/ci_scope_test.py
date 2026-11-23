@@ -9,6 +9,19 @@ spec.loader.exec_module(scope)
 
 
 class ScopeTests(unittest.TestCase):
+    def test_commit_marker_selects_ui(self):
+        self.assertEqual(scope.requested_scope('auto', 'Fix heading\n\nCI-Scope: ui\n'), 'ui')
+        self.assertEqual(scope.requested_scope('auto', 'Mention CI-Scope: ui in prose'), 'auto')
+
+    def test_full_and_invalid_markers_take_precedence(self):
+        for message in ['CI-Scope: full', 'CI-Scope: unknown', 'CI-Scope: ui\nCI-Scope: full']:
+            self.assertEqual(scope.requested_scope('ui', message), 'full')
+        self.assertEqual(scope.requested_scope('full', 'CI-Scope: ui'), 'full')
+
+    def test_marker_cannot_override_domain_changes(self):
+        requested = scope.requested_scope('auto', 'CI-Scope: ui')
+        self.assertEqual(scope.choose_scope([('model.js', 'a', 'b')], requested), 'full')
+
     def test_versions_and_docs(self):
         self.assertEqual(scope.choose_scope([
             ('app.js', 'sidesteps v. 0.3.1-rc.1', 'sidesteps v. 0.3.1-rc.2'),

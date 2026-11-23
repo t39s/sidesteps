@@ -19,6 +19,16 @@ def normalize_version(path, text):
     return text
 
 
+def requested_scope(requested, message):
+    markers = re.findall(r'^CI-Scope:[ \t]*(.*)$', message, re.MULTILINE)
+    markers = [value.strip() for value in markers]
+    if requested == 'full' or any(value != 'ui' for value in markers):
+        return 'full'
+    if requested == 'ui' or markers:
+        return 'ui'
+    return 'auto'
+
+
 def choose_scope(changes, requested='auto'):
     if requested == 'full':
         return 'full'
@@ -56,7 +66,8 @@ if __name__ == '__main__':
                 before = None
             after = Path(path).read_text() if Path(path).is_file() else None
             changes.append((path, before, after))
-        scope = choose_scope(changes, args.requested)
+        requested = requested_scope(args.requested, git('log', '-1', '--format=%B'))
+        scope = choose_scope(changes, requested)
     except (subprocess.CalledProcessError, UnicodeError):
         scope = 'full'
     print(scope)

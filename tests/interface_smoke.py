@@ -11,7 +11,7 @@ with sync_playwright() as playwright:
         page, errors = make_page(browser, viewport_width=width, mobile=True)
         assert page.locator('.app-version').inner_text().startswith('sidesteps v.')
         page.get_by_role('link', name='Интерфейс тренера', exact=True).click()
-        assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
+        assert page.get_by_role('heading', name='Вход тренера', exact=True).is_visible()
         page.get_by_role('button', name='Назад', exact=True).click()
         trainer(page)
         page.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

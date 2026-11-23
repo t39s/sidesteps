@@ -155,7 +155,7 @@ def test_history_chart_portrait(browser):
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
-        q.get_by_role('heading',name='Вход в интерфейс тренера').wait_for()
+        q.get_by_role('heading',name='Вход тренера').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
         assert history.get_attribute('aria-selected')=='true'
