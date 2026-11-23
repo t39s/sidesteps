@@ -139,7 +139,7 @@ test('trainer history has one login below brand and athlete history panels',()=>
     const f=fixture(state);f.api.setScreen('history');if(mode==='trainer')f.api.unlock();
     f.api.render();const html=f.app.innerHTML;
     assert.equal((html.match(/data-act="pin"/g)||[]).length,mode==='child'?1:0);
-    if(mode==='child')assert.match(html,/<header[\s\S]*class="mode-tag header-login">Войти<\/a>[\s\S]*<\/header>/);
+    if(mode==='child')assert.match(html,/<header[\s\S]*class="mode-tag header-login">Интерфейс тренера<\/a>[\s\S]*<\/header>/);
     assert.match(html,/data-act="back-history"/);
     assert.match(html,/Мой прогресс/);assert.match(html,/history-chart/);
     assert.match(html,/Спортсмен/);
@@ -147,7 +147,7 @@ test('trainer history has one login below brand and athlete history panels',()=>
 });
 test('trainer exit is a link and returns to athlete history',async()=>{
   const s=M.blank();s.device.lastInterface='trainer';const f=fixture(s);f.api.unlock();
-  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Выйти из режима Тренера<\/a>/);
+  const html=f.api.trainerHome();assert.match(html,/<a href="#exit" data-act="switch-athlete" class="mode-tag trainer-exit">Интерфейс спортсмена<\/a>/);
   assert.doesNotMatch(html,/Мои упражнения/);
   await f.api.handleAction('switch-athlete',{});assert.equal(f.api.screen(),'athlete');
 });
@@ -182,7 +182,7 @@ test('trainer background scope and final login under brand',async()=>{
   f.api.setScreen('child-final');f.api.render();
   assert.ok(f.bodyClasses.has('trainer-theme'));
   assert.equal((f.app.innerHTML.match(/data-act="pin"/g)||[]).length,1);
-  assert.match(f.app.innerHTML,/<header[\s\S]*header-login">Войти<\/a>[\s\S]*<\/header>/);
+  assert.match(f.app.innerHTML,/<header[\s\S]*header-login">Интерфейс тренера<\/a>[\s\S]*<\/header>/);
   await f.api.handleAction('switch-athlete',{});
   assert.ok(!f.bodyClasses.has('trainer-theme'));
 });
@@ -193,7 +193,7 @@ test('trainer session login stays beneath brand on every screen, never in footer
   for(const screen of ['child-ready','result','rest','child-final','history','settings']){
     f.api.setScreen(screen);f.api.render();const html=f.app.innerHTML;
     assert.equal((html.match(/data-act="pin"/g)||[]).length,1,screen);
-    assert.match(html,/<header[\s\S]*header-login">Войти<\/a>[\s\S]*<\/header>/,screen);
+    assert.match(html,/<header[\s\S]*header-login">Интерфейс тренера<\/a>[\s\S]*<\/header>/,screen);
     assert.doesNotMatch(html,/<footer[\s\S]*data-act="pin"/,screen);
   }
 });

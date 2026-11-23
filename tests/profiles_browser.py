@@ -28,7 +28,7 @@ def test_migration(browser):
     data=p.evaluate('window.__dump()');p.close()
     q,e=make_page(browser,data)
     assert state(q)['baseProfileId']==old['athletes'][1]['id']
-    assert q.get_by_role('heading',name='Вход Тренера').is_visible()
+    assert q.get_by_role('heading',name='Вход тренера').is_visible()
     assert not errors+e,errors+e
     q.close()
 def test_deleted_session_migration(browser):
@@ -73,7 +73,7 @@ def test_profiles(browser):
     p.get_by_role('link',name='К управлению занятием').click()
     p.get_by_role('button',name='Вернуться к занятию').click()
     # Exit cannot drop an active session or its current turn.
-    p.get_by_role('button',name='Выйти из режима Тренера').click()
+    p.get_by_role('link',name='Интерфейс спортсмена').click()
     assert state(p)['device']['activeChildSessionId']
     tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
@@ -89,7 +89,7 @@ def test_profiles(browser):
     p.get_by_role('link',name='К управлению занятием').click()
     assert p.get_by_role('button',name='Начать занятие').is_visible()
     assert p.locator('#pin-input').count()==0
-    p.get_by_role('link',name='Выйти из режима Тренера').click()
+    p.get_by_role('link',name='Интерфейс спортсмена').click()
     new_exercise(p,attempts=1,mode='stopwatch');tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][1]['athleteId']==state(p)['baseProfileId']
@@ -136,7 +136,7 @@ def test_http_pwa(browser):
         p.goto(url);p.get_by_role('tab',name='История').wait_for()
         assert p.evaluate('isSecureContext&&!!crypto.subtle')
         # Native PBKDF2 rejects wrong PIN; production verifier unchanged.
-        p.get_by_role('link',name='Войти',exact=True).click();p.locator('#pin-input').fill('wrong')
+        p.get_by_role('link',name='Интерфейс тренера',exact=True).click();p.locator('#pin-input').fill('wrong')
         p.get_by_role('button',name='Войти',exact=True).click();p.get_by_text('Неверный PIN',exact=True).wait_for()
         p.get_by_role('button',name='Назад',exact=True).click()
         p.evaluate('navigator.serviceWorker.ready');p.wait_for_function('!!navigator.serviceWorker.controller')

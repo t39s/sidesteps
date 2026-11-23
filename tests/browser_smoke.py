@@ -37,7 +37,7 @@ def tap(page):
     page.wait_for_timeout(90)
 
 def trainer(page):
-    page.get_by_role('link',name='Войти',exact=True).click()
+    page.get_by_role('link',name='Интерфейс тренера',exact=True).click()
     page.locator('#pin-input').fill(PIN)
     page.get_by_role('button',name='Войти',exact=True).click()
     page.get_by_text('Управление занятием').wait_for(timeout=5000)
@@ -168,7 +168,7 @@ def test_resume_between_attempts(browser):
 
 def test_pin_no_config(browser):
     page,errors=make_page(browser,pin=False)
-    page.get_by_role('link',name='Войти',exact=True).click()
+    page.get_by_role('link',name='Интерфейс тренера',exact=True).click()
     page.get_by_text('PIN пока не сконфигурирован',exact=False).wait_for(timeout=5000)
     assert 'pin-input' not in page.locator('body').inner_html()
     assert page.get_by_text('Доступ Тренера',exact=True).count()==0
@@ -198,7 +198,7 @@ def test_rest_and_early_start(browser):
     page.get_by_role('heading',name='Отдых',exact=True).wait_for()
     assert page.get_by_role('button',name='Начать раньше').bounding_box()['width']==result_button_width
     assert page.get_by_text('Спортсмен',exact=True).count()==0
-    assert page.locator('footer').get_by_role('link',name='Войти').is_visible()
+    assert page.locator('footer').get_by_role('link',name='Интерфейс тренера').is_visible()
     page.get_by_role('button',name='Начать раньше').click()
     page.get_by_text('Попытка 2 из 2').wait_for()
     tap(page);tap(page)
@@ -248,7 +248,7 @@ def test_trainer_relocked_on_reload(browser):
     trainer(page)
     data=page.evaluate('window.__dump()');page.close()
     restored,errs2=make_page(browser,data)
-    restored.get_by_role('heading',name='Вход Тренера').wait_for(timeout=5000)
+    restored.get_by_role('heading',name='Вход тренера').wait_for(timeout=5000)
     assert 'Управление занятием' not in restored.locator('body').inner_text()
     assert not errs+errs2,errs+errs2
     restored.close()

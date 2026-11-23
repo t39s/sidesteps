@@ -64,7 +64,7 @@ def test_child_single_reload_and_early(browser):
     restored.mouse.down();restored.wait_for_timeout(210);restored.mouse.up()
     restored.get_by_text('Попытка 2 из 2').wait_for(timeout=2500)
     assert restored.locator('.child .app-head .mode-tag').count()==0
-    assert restored.get_by_role('link',name='Войти').is_visible()
+    assert restored.get_by_role('link',name='Интерфейс тренера').is_visible()
     tap(restored);tap(restored)
     restored.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert not errors+errs,errors+errs
@@ -145,8 +145,8 @@ def test_history_chart_portrait(browser):
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
         footer=q.locator('footer')
         version=footer.locator('.app-version')
-        login=footer.get_by_role('link',name='Войти')
-        assert footer.inner_text()=='sidesteps v. 0.3.0 · Войти'
+        login=footer.get_by_role('link',name='Интерфейс тренера')
+        assert footer.inner_text()=='sidesteps v. 0.3.0 · Интерфейс тренера'
         assert login.get_attribute('title')=='Для Тренера'
         assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
         font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
@@ -155,7 +155,7 @@ def test_history_chart_portrait(browser):
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
-        q.get_by_role('heading',name='Вход Тренера').wait_for()
+        q.get_by_role('heading',name='Вход тренера').wait_for()
         q.get_by_role('button',name='Назад').click()
         chart.wait_for()
         assert history.get_attribute('aria-selected')=='true'
