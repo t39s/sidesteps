@@ -70,11 +70,14 @@ def test_profiles(browser):
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать занятие').click()
     assert p.locator('#pin-input').count()==0
+    exit_link=p.get_by_role('link',name='Интерфейс спортсмена')
+    assert exit_link.count()==0
     p.get_by_role('link',name='К управлению занятием').click()
+    # Exit on the trainer overview cannot drop an active session or its current turn.
+    active=state(p)['device']['activeChildSessionId']
+    exit_link.click()
+    assert state(p)['device']['activeChildSessionId']==active
     p.get_by_role('button',name='Вернуться к занятию').click()
-    # Exit cannot drop an active session or its current turn.
-    p.get_by_role('link',name='Интерфейс спортсмена').click()
-    assert state(p)['device']['activeChildSessionId']
     tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][0]['athleteId']==aid
