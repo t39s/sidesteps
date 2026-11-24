@@ -83,7 +83,7 @@ def test_profiles(browser):
     assert state(p)['attempts'][0]['athleteId']==aid
     assert state(p)['workouts'][0]['kind']=='child'
     p.get_by_role('button',name='История',exact=True).click()
-    p.locator('summary').first.click()
+    p.get_by_text('Подробнее',exact=True).first.click()
     p.get_by_label('Комментарий спортсмена').fill('Со слов спортсмена')
     p.get_by_label('Комментарий тренера').fill('<b>Наблюдение</b>')
     p.get_by_role('button',name='Сохранить комментарии').click()
@@ -97,7 +97,7 @@ def test_profiles(browser):
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][1]['athleteId']==state(p)['baseProfileId']
     p.get_by_role('button',name='На главную').click()
-    p.locator('summary').first.click()
+    p.get_by_text('Подробнее',exact=True).first.click()
     assert p.get_by_label('Комментарий тренера').count()==0
     p.get_by_label('Комментарии',exact=True).fill('Личный комментарий')
     p.get_by_role('button',name='Сохранить комментарии').click()
