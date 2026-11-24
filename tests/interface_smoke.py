@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера',exact=True)
-        assert version.inner_text()=='v. 0.3.5-rc.3'
+        assert version.inner_text()=='v. 0.3.5-rc.4'
         assert login.count()==0
         page.get_by_role('tab',name='Новая тренировка').click()
         page.get_by_role('button',name='Настройки',exact=True).click()
@@ -33,12 +33,18 @@ with sync_playwright() as playwright:
         page.get_by_role('tab',name='История',exact=True).wait_for()
         page.get_by_role('button',name='Настройки',exact=True).click()
         assert page.get_by_role('heading',name='Настройки',exact=True).is_visible()
-        assert page.locator('main > .panel > h2').all_text_contents()==['История','Название профиля']
+        assert page.locator('main > .panel > h2').all_text_contents()==['Название профиля','История']
         assert page.locator('.settings-icon,.close-training').count()==0
         assert_form_fields(page,['#profile-name'])
         page.locator('#profile-name').fill('Длинное имя спортивного профиля для проверки')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
-        page.get_by_role('button',name='Не сохранять',exact=True).click()
+        save=page.get_by_role('button',name='Сохранить',exact=True)
+        discard=page.get_by_role('button',name='Не сохранить',exact=True)
+        assert abs(save.bounding_box()['y']-discard.bounding_box()['y'])<1
+        assert save.bounding_box()['x']<discard.bounding_box()['x']
+        switch=page.get_by_role('switch',name='Показывать кнопки удаления в Истории')
+        assert save.bounding_box()['y']>switch.bounding_box()['y']+switch.bounding_box()['height']
+        discard.click()
         more=page.locator('.history-more > summary')
         more.click()
         assert login.is_visible()
@@ -75,7 +81,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='v. 0.3.5-rc.3'
+        assert footer.locator('.app-version').inner_text()=='v. 0.3.5-rc.4'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

@@ -1,9 +1,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),M=require('../model.js');
 const source=fs.readFileSync(require.resolve('../app.js'),'utf8');
 async function page(initial={},options={}){
- const data=new Map(Object.entries(initial)),nodes={},events={},appEvents={},messages=[];let failWrite=false;
+ const data=new Map(Object.entries(initial)),nodes={},events={},appEvents={},messages=[];let failedKey;
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
- const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failWrite)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
+ const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failedKey===true||failedKey===k)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
  const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
  const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,statsPoints,recordAsOf,workoutDetails,archiveHistory,historyItems,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
@@ -12,7 +12,7 @@ async function page(initial={},options={}){
  navigator:{},console:{error(){}},Date,performance:{now:()=>1000},setTimeout(){},clearTimeout(){},setInterval(){},
  crypto:{subtle:{importKey:async()=>0,deriveBits:async()=>new Uint8Array(32).buffer}},TextEncoder,atob,
  });
- await new Promise(r=>setImmediate(r));return {data,store,nodes,events,appEvents,messages,api:browser.api,html:()=>app.innerHTML,failWrite(){failWrite=true;}};
+ await new Promise(r=>setImmediate(r));return {data,store,nodes,events,appEvents,messages,api:browser.api,html:()=>app.innerHTML,failWrite(key=true){failedKey=key;}};
 }
 const v5=require('./fixtures/v5-multiple.json');
 test('multi startup waits without any v5 or v6 write; cancel/reload/no PIN unchanged',async()=>{const bytes=JSON.stringify(v5);for(const noPin of [false,true]){const p=await page({[M.V5_KEY]:bytes},{noPin});assert.match(p.html(),/Выберите базовый профиль/);assert.equal(p.data.get(M.V5_KEY),bytes);assert.equal(p.data.has(M.KEY),false);await p.api.handleAction('pin-back');assert.equal(p.data.has(M.KEY),false);await p.api.init();assert.equal(p.data.get(M.V5_KEY),bytes);assert.equal(p.data.has(M.KEY),false);}});
@@ -89,7 +89,7 @@ test('personal profile rename preserves identity and history in export and reloa
   await p.api.handleAction('settings');
   assert.match(p.html(),/Название профиля[\s\S]*id="profile-name"/);
   p.nodes['profile-name']={value:'  Моё имя  '};
-  await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
+  await p.api.handleAction('settings-save',{dataset:{id:s.athletes[1].id}});
   const out=p.api.exportSnapshot();
   assert.equal(out.athletes[0].id,s.baseProfileId);
   assert.equal(out.athletes[0].name,'Моё имя');
@@ -99,16 +99,20 @@ test('personal profile rename preserves identity and history in export and reloa
   const q=await page(Object.fromEntries(p.data));
   assert.equal(q.api.state().athletes[0].name,'Моё имя');
 });
-test('personal profile rename rejects invalid input and failed writes atomically',async()=>{
-  for(const value of ['', ' '.repeat(2), 'a'.repeat(51), 'Новое имя']){
+test('history settings keep both previous values after invalid input or a failed write',async()=>{
+  for(const [value,failedKey] of [['',null],['  ',null],['a'.repeat(51),null],['Новое имя',M.KEY],['Новое имя',M.SETTINGS_KEY]]){
     const p=await page();
     await p.api.handleAction('settings');
-    const before=p.data.get(M.KEY);
+    const before=p.data.get(M.KEY),settingsBefore=p.data.get(M.SETTINGS_KEY);
     p.nodes['profile-name']={value};
-    if(value==='Новое имя')p.failWrite();
-    await p.api.handleAction('save-profile-name');
+    p.appEvents.change({target:{id:'show-history-delete',checked:true}});
+    if(failedKey)p.failWrite(failedKey);
+    await p.api.handleAction('settings-save');
     assert.equal(p.data.get(M.KEY),before);
+    assert.equal(p.data.get(M.SETTINGS_KEY),settingsBefore);
     assert.equal(p.api.state().athletes[0].name,'Спортсмен');
+    assert.notEqual(p.api.settings().showAthleteHistoryDelete,true);
+    assert.equal(p.api.screen(),'settings');
   }
 });
 
@@ -235,8 +239,10 @@ test('archive, history and interrupted lists expand independently and retain sta
 test('export uses the last saved name while the name field is being edited',async()=>{
   const p=await page();await p.api.handleAction('settings');
   p.nodes['profile-name']={value:'Сохранено'};
-  await p.api.handleAction('save-profile-name');
+  await p.api.handleAction('settings-save');
+  await p.api.handleAction('settings');
   p.nodes['profile-name'].value='Черновик';
+  await p.api.handleAction('settings-back');
   assert.equal(p.api.exportSnapshot().athletes[0].name,'Сохранено');
 });
 test('during rest only animation can be edited and leaving settings preserves the attempt',async()=>{
