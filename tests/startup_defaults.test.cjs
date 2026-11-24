@@ -92,7 +92,7 @@ test('reload restores exercise defaults and preserves history and identity', asy
 test('starting another exercise in the same page keeps user choices', async () => {
   const storage = new Map();
   const page = await openPage(storage);
-  page.click('settings');
+  page.click('open-exercise');page.click('settings');
   page.change('attempt-count', '1');
   page.change('mode-select', 'stopwatch');
   page.click('settings-save');
@@ -202,7 +202,7 @@ for(const child of [false,true])test(`${child?'coach device':'personal device'}:
 });
 for(const chosen of ['pulse','glow','none'])test(`manual ${chosen} overrides automatic rule immediately and after reload`,async()=>{
   const storage=storeState(M.blank()),page=await openPage(storage,Date.parse('2026-11-19T08:00:00'));
-  page.click('settings');page.change('launch-animation',chosen);page.click('settings-save');page.click('open-exercise');
+  page.click('open-exercise');page.click('settings');page.change('launch-animation',chosen);page.click('settings-save');page.click('open-exercise');
   assert.ok(page.html().includes(`counter counter-ready launch-${chosen}`));
   const later=await openPage(storage,Date.parse('2026-12-21T08:00:00'));later.click('open-exercise');
   assert.ok(later.html().includes(`counter counter-ready launch-${chosen}`));
@@ -225,7 +225,7 @@ test('in-app reset starts a new animation day and glow takes over after a comple
   page.click('reset-all');
   assert.equal(page.state().device.launchAnimation, undefined);
 
-  page.click('settings');
+  page.click('open-exercise');page.click('settings');
   page.change('attempt-count', '1');
   page.change('mode-select', 'stopwatch');
   page.click('settings-save');

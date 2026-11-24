@@ -45,7 +45,7 @@ def tap(page,advance=True):
 def open_trainer_login(page):
     link=page.get_by_role('link',name='Интерфейс тренера',exact=True)
     if not link.count():
-        page.get_by_role('button',name='Настройки',exact=True).click()
+        page.locator('.history-more > summary').click()
     link.click()
 
 def trainer(page):
@@ -55,6 +55,7 @@ def trainer(page):
     page.get_by_text('Управление занятием').wait_for(timeout=5000)
 
 def new_exercise(page, attempts=None, mode=None):
+    page.get_by_role('tab',name='Новая тренировка').click()
     if attempts is not None or mode is not None:
         page.get_by_role('button',name='Настройки',exact=True).click()
         if attempts is not None:
@@ -62,7 +63,6 @@ def new_exercise(page, attempts=None, mode=None):
         if mode is not None:
             page.locator('#mode-select').select_option(mode)
         page.get_by_role('button',name='Сохранить настройки',exact=True).click()
-    page.get_by_role('tab',name='Новая тренировка').click()
 
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
@@ -191,8 +191,6 @@ def test_pin_no_config(browser):
     assert card.get_by_role('button',name='Назад').count()==0
     assert abs(back.bounding_box()['width']-card.bounding_box()['width'])<1
     back.click()
-    assert page.get_by_role('heading',name='Настройки',exact=True).is_visible()
-    page.get_by_role('button',name='Не сохранять',exact=True).click()
     assert page.get_by_role('tab',name='История').is_visible()
     page.close()
 
@@ -215,8 +213,16 @@ def test_rest_and_early_start(browser):
     assert page.get_by_role('button',name='Начать раньше').bounding_box()['width']==result_button_width
     assert page.get_by_text('Спортсмен',exact=True).count()==0
     assert page.locator('footer').get_by_role('link',name='Интерфейс тренера').count()==0
+    page.get_by_role('button',name='Настройки',exact=True).click()
+    assert page.get_by_role('heading',name='Настройки тренировки',exact=True).is_visible()
+    assert page.get_by_text('Режим и число попыток можно изменить перед следующей тренировкой.').is_visible()
+    assert page.locator('#attempt-count,#mode-select,.settings-icon,.close-training').count()==0
+    page.get_by_label('Без анимации',exact=True).check()
+    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    assert page.get_by_role('heading',name='Отдых',exact=True).is_visible()
     page.get_by_role('button',name='Начать раньше').click()
     page.get_by_text('Попытка 2 из 2').wait_for()
+    assert page.locator('.tap-surface .launch-none').is_visible()
     tap(page);tap(page)
     page.get_by_text('Тренировка завершена').wait_for()
     assert page.locator('main > .panel').count()==2

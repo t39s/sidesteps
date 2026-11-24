@@ -84,7 +84,6 @@
 }
 .header-controls{flex-wrap:nowrap}
 .header-actions{grid-column:1 / -1;justify-content:flex-end}
-.toolbar .settings-return{color:var(--nav-return-color)}
 .gear-glyph,.speaker-glyph{display:block;width:calc(.85 * var(--brand-height));height:calc(.85 * var(--brand-height));pointer-events:none}
 :root{--nav-return-color:#78dc9b}
 button.nav-return{background:var(--nav-return-color);border-color:var(--nav-return-color);color:#152c20}
@@ -98,7 +97,7 @@ button.nav-return{background:var(--nav-return-color);border-color:var(--nav-retu
 body.trainer-theme{background:#321B27}
 .trainer-theme .header-login{margin-top:.5em}
 
-.trainer-theme .settings-icon:not(.settings-return){color:#929292}
+.trainer-theme .settings-icon{color:#929292}
 
 .stopwatch-counter{display:flex;align-items:center;justify-content:center;min-height:clamp(204px,54vw,420px);font-size:clamp(64px,18vw,136px);font-weight:850;font-variant-numeric:tabular-nums;white-space:nowrap}
 .toolbar .settings-icon:disabled{color:#929292;opacity:1}
@@ -149,3 +148,7 @@ body.trainer-theme{background:#321B27}
 input:not([type=checkbox], [type=radio], [type=file]), select, textarea {
   font-size: max(16px, 1em);
 }
+
+.history-more{margin:0;white-space:normal}
+.history-more-links{display:grid;gap:.5rem;padding:.4rem 0}
+.archive-add{margin-bottom:.75rem}

@@ -3,8 +3,8 @@ const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer centers coach link above version',()=>{
   const app=get('app.js');
   assert.match(app,/athlete-footer/);
-  assert.match(app,/app-version">v\. 0\.3\.5-rc\.1/);
-  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера<\/a>/);
+  assert.match(app,/app-version">v\. 0\.3\.5-rc\.2/);
+  assert.match(app,/<details class="history-more"><summary>Ещё<\/summary>[\s\S]*Интерфейс тренера<\/a>/);
   assert.match(get('styles.css'),/\.athlete-footer\{[^}]*flex-direction:column/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
@@ -60,6 +60,7 @@ test('touch release voices a precise result once, with an independent display de
   });
   await new Promise(resolve=>setImmediate(resolve));
   const click=act=>appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act}})}});
+  click('open-exercise');
   click('settings');
   appEvents.change({target:{id:'attempt-count',value:'1'}});
   click('settings-save');

@@ -146,9 +146,9 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         assert footer.get_by_role('link',name='Интерфейс тренера').count()==0
-        q.get_by_role('button',name='Настройки',exact=True).click()
+        q.locator('.history-more > summary').click()
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='v. 0.3.5-rc.1'
+        assert version.inner_text()=='v. 0.3.5-rc.2'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
@@ -162,7 +162,6 @@ def test_history_chart_portrait(browser):
         login.press('Enter')
         q.get_by_role('heading',name='Вход в интерфейс тренера').wait_for()
         q.get_by_role('button',name='Назад').click()
-        q.get_by_role('button',name='Не сохранять',exact=True).click()
         chart.wait_for()
         assert history.get_attribute('aria-selected')=='true'
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'

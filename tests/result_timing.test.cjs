@@ -345,8 +345,8 @@ test('storage failure cannot falsely cancel or close the running workout',async(
   }
 });
 
-test('animation settings follow training and show three live radio samples',()=>{
-  const f=readyFixture();f.api.setScreen('settings');f.api.render();const html=f.app.innerHTML;
+test('animation settings follow training and show three live radio samples',async()=>{
+  const f=readyFixture();await f.api.handleAction('settings');f.api.render();const html=f.app.innerHTML;
   assert.ok(html.indexOf('<h2>Тренировка</h2>')<html.indexOf('Анимация запуска'));
   for(const name of ['Сияние','Пульсация','Без анимации'])assert.ok(html.includes(name));
   assert.equal((html.match(/name="launch-animation"/g)||[]).length,3);
@@ -356,7 +356,7 @@ test('animation settings follow training and show three live radio samples',()=>
 for(const value of ['glow','pulse','none'])test(`animation selection ${value} applies after save in both modes and on coach device`,async()=>{
   for(const child of [false,true])for(const mode of ['intervals','stopwatch']){
     const f=readyFixture(mode,{child});const previous=f.api.state().device.lastInterface;
-    f.api.state().device.lastInterface='athlete';f.api.setScreen('settings');f.chooseAnimation(value);
+    f.api.state().device.lastInterface='athlete';f.api.setScreen('athlete-ready');await f.api.handleAction('settings');f.chooseAnimation(value);
     assert.notEqual(f.api.state().device.launchAnimation,value);
     f.api.render();assert.ok(f.app.innerHTML.includes(`value="${value}" checked`));
     await f.api.handleAction('settings-save');assert.equal(f.api.state().device.launchAnimation,value);
