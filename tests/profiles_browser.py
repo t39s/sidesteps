@@ -179,7 +179,7 @@ def test_personal_data_management(browser):
     p, errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
-    assert headings==['История'],headings
+    assert headings==['История','Название профиля'],headings
     assert p.get_by_role('button',name='Выгрузить',exact=True).count()==0
     switch=p.get_by_role('switch',name='Показывать кнопки удаления в Истории')
     assert not switch.is_checked()
@@ -215,8 +215,7 @@ def test_personal_data_management(browser):
     assert [x['bestMs'] for x in sorted(state(p)['archived'],key=lambda a:a['date'],reverse=True)]==[12345,1500]
     newest=state(p)['archived'][-1]['id']
     assert p.locator('[data-history-archive]').first.get_attribute('data-history-archive')==newest
-    p.locator('.history-more > summary').click()
-    p.get_by_role('link',name='Обменяться данными',exact=True).click()
+    p.get_by_role('button',name='Настройки',exact=True).click()
     before_name=state(p)
     p.get_by_label('Имя (указывается в файле выгрузки)',exact=True).fill('Личный профиль')
     p.get_by_role('button',name='Сохранить',exact=True).click()
