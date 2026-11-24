@@ -19,7 +19,7 @@ async function openPage(storage, wallTime = null) {
 
   const browser = { ILModel: M, SideMigration: { run: () => ({}) }, confirm: () => true, addEventListener() {} };
   const app = {
-    innerHTML: '',
+    innerHTML: '', style:{},
     querySelector: () => null,
     querySelectorAll: () => [],
     addEventListener(name, handler) { events[name] = handler; },
@@ -68,7 +68,7 @@ test('first load starts muted with two interval attempts', async () => {
   page.click('open-exercise');
   assert.match(page.html(), /Попытка 1 из 2/);
   assert.match(page.html(), /play-glyph/);
-  assert.ok(page.html().includes(`0 / ${config.intervalCount} интервалов`));
+  assert.ok(page.html().includes(`0 / ${config.workingIntervalCount} интервалов`));
 });
 
 test('reload restores exercise defaults and preserves history and identity', async () => {
@@ -95,7 +95,7 @@ test('starting another exercise in the same page keeps user choices', async () =
   page.click('settings');
   page.change('attempt-count', '1');
   page.change('mode-select', 'stopwatch');
-  page.click('settings-back');
+  page.click('settings-save');
   page.click('toggle-sound');
   page.click('open-exercise');
   page.tap();
@@ -116,7 +116,7 @@ test('starting another exercise in the same page keeps user choices', async () =
 
 test('reload between attempts preserves the active workout and measurement mode', async () => {
   const started = M.startSolo(M.blank(), 'athlete-default', 2);
-  const attempt = M.startAttempt(started.state, started.value.id, 'stopwatch', config.intervalCount);
+  const attempt = M.startAttempt(started.state, started.value.id, 'stopwatch', config.workingIntervalCount);
   const finished = M.finishAttempt(attempt.state, attempt.value.id, 2000, []);
   const state = finished.state;
   state.device.measurementMode = 'stopwatch';
@@ -164,8 +164,8 @@ test('only a workout with two completed attempts gets a best-attempt mark', asyn
     const started = M.startSolo(state, 'athlete-default', durations.length);
     state = started.state;
     for (const duration of durations) {
-      const attempt = M.startAttempt(state, started.value.id, 'stopwatch', config.intervalCount);
-      state = M.finishAttempt(attempt.state, attempt.value.id, duration, []).state;
+      const attempt = M.startAttempt(state, started.value.id, 'intervals', config.workingIntervalCount);
+      state = M.finishAttempt(attempt.state, attempt.value.id, duration, Array(20).fill(duration/20)).state;
     }
   }
   workout([2000]);
@@ -202,7 +202,7 @@ for(const child of [false,true])test(`${child?'coach device':'personal device'}:
 });
 for(const chosen of ['pulse','glow','none'])test(`manual ${chosen} overrides automatic rule immediately and after reload`,async()=>{
   const storage=storeState(M.blank()),page=await openPage(storage,Date.parse('2026-11-19T08:00:00'));
-  page.click('settings');page.change('launch-animation',chosen);page.click('settings-back');page.click('open-exercise');
+  page.click('settings');page.change('launch-animation',chosen);page.click('settings-save');page.click('open-exercise');
   assert.ok(page.html().includes(`counter counter-ready launch-${chosen}`));
   const later=await openPage(storage,Date.parse('2026-12-21T08:00:00'));later.click('open-exercise');
   assert.ok(later.html().includes(`counter counter-ready launch-${chosen}`));
@@ -228,7 +228,7 @@ test('in-app reset starts a new animation day and glow takes over after a comple
   page.click('settings');
   page.change('attempt-count', '1');
   page.change('mode-select', 'stopwatch');
-  page.click('settings-back');
+  page.click('settings-save');
   page.click('open-exercise');
   assert.match(page.html(), /counter counter-ready launch-pulse/);
   page.tap();

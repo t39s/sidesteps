@@ -131,3 +131,18 @@ body.trainer-theme{background:#321B27}
 
 .workout-comments textarea{display:block;width:100%;font:inherit;font-size:16px;background:#0d2135;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:5px;resize:vertical}
 .comment-text{white-space:pre-wrap;overflow-wrap:anywhere}
+
+.athlete-footer{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}.athlete-footer>.app-version{order:2}.athlete-footer>a{order:1}.deletion-title{color:var(--danger)}
+
+.backup-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.backup-actions>button{width:100%;min-width:0}.backup-actions>.wide{grid-column:1/-1}
+
+.statistics-option{display:flex;align-items:center;gap:.75rem}.statistics-option input{width:1.4rem;min-height:1.4rem;height:1.4rem;flex:0 0 1.4rem;margin:0}
+
+.settings-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.settings-actions>button{min-width:0}
+.archive-field>span,.archive-field>input{display:block}
+.archive-field>input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
+.archive-field>input[type=date]{-webkit-appearance:none;appearance:none}
+.archive-field>input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1em}
+
+#pin-input{font-size:16px}

@@ -1,7 +1,8 @@
-sidesteps v0.3.2
-Release date: 2026-11-23
-Status: STABLE — accepted by owner 2026-11-23
+sidesteps v0.3.3
+Release date: 2026-11-24
+Status: STABLE — accepted by owner 2026-11-24
 Branch: main
-Stable baseline: v0.3.1, main d60fa87b11f447df4664158e6e2002f4fe6524ba
-Training preset: 20 intervals, rest 120 seconds, minimum tap gap 500 ms.
-Changes: browser CI uses preinstalled Google Chrome and runner system libraries.
+Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
+Accepted candidate: v0.3.3-rc.10, be5e1c5f456a72d88e33bb1218ee7fc28b464313
+Default modes: working 20 intervals, test 4 intervals, test stopwatch; rest 120/20 seconds; minimum tap gap 500 ms.
+Changes: training modes and coach settings, archive statistics, athlete settings, and coach entry.

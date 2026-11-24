@@ -1,9 +1,11 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
-test('athlete footer contains the version and administrator link on one line',()=>{
+test('athlete footer centers coach link above version',()=>{
   const app=get('app.js');
-  assert.match(app,/<footer class="nav-spacer app-footer"><span class="app-version">sidesteps v\. 0\.3\.2<\/span>/);
-  assert.match(app,/<span aria-hidden="true">·<\/span> <a href="#admin-login" data-act="pin" title="Для Тренера">Интерфейс тренера<\/a>/);
+  assert.match(app,/athlete-footer/);
+  assert.match(app,/app-version">v\. 0\.3\.3/);
+  assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера<\/a>/);
+  assert.match(get('styles.css'),/\.athlete-footer\{[^}]*flex-direction:column/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
   assert.doesNotMatch(get('index.html'),/0\.2\.3/);
   assert.doesNotMatch(get('manifest.webmanifest'),/0\.2\.3/);
@@ -34,13 +36,13 @@ test('rest clock updates without replacing touch targets every tick',()=>{
 test('touch release voices a precise result once, with an independent display deadline',async()=>{
   const vm=require('node:vm');
   const M=require('../model.js');
-  const config={...JSON.parse(get('config.json')),intervalCount:1,minTapGapMs:0,resultDisplaySec:5,recordDisplaySec:10};
+  const config={...JSON.parse(get('config.json')),workingIntervalCount:1,minTapGapMs:500,resultDisplaySec:5,recordDisplaySec:10};
   const appEvents={},documentEvents={},spoken=[];
   let initial=M.blank();
   initial.device.soloPlannedAttempts=1;
   let state=JSON.stringify(initial),now=1000,clock=Date.now(),tick,showResult;
   class TestDate extends Date { static now(){return clock;} }
-  const app={innerHTML:'',querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
+  const app={innerHTML:'',style:{},querySelector:()=>null,addEventListener:(name,handler)=>{appEvents[name]=handler;}};
   let heldSpeech=null,holdSpeech=true;
   const speechSynthesis={cancel(){},speak:utterance=>{
     spoken.push(utterance.text);
@@ -51,7 +53,7 @@ test('touch release voices a precise result once, with an independent display de
   vm.runInNewContext(get('app.js'),{
     window:{ILModel:M,SideMigration:{run:()=>({})},addEventListener(){},speechSynthesis,SpeechSynthesisUtterance},
     document:{getElementById:()=>app,addEventListener:(name,handler)=>{documentEvents[name]=handler;}},
-    localStorage:{getItem:()=>state,setItem:(_key,value)=>{state=value;}},
+    localStorage:{getItem:key=>key===M.KEY?state:key===M.SETTINGS_KEY?JSON.stringify({...M.defaultTrainerSettings(config,false),workingCountLocked:true}):null,setItem:(key,value)=>{if(key===M.KEY)state=value;}},
     fetch:async()=>({ok:true,json:async()=>config}),
     navigator:{},performance:{now:()=>now},console,speechSynthesis,SpeechSynthesisUtterance,
     Date:TestDate,setInterval:fn=>{tick=fn;},setTimeout:(fn,ms)=>{if(ms===200)showResult=fn;},clearTimeout(){},
@@ -60,7 +62,7 @@ test('touch release voices a precise result once, with an independent display de
   const click=act=>appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act}})}});
   click('settings');
   appEvents.change({target:{id:'attempt-count',value:'1'}});
-  click('settings-back');
+  click('settings-save');
   appEvents.click({target:{closest:()=>({matches:()=>false,dataset:{act:'toggle-sound'},setAttribute(){}})}});
   click('open-exercise');
   const touch=pointerId=>({pointerId,pointerType:'touch',button:0,target:{closest:()=>true},preventDefault(){}});
