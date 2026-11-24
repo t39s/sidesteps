@@ -3,17 +3,25 @@ import os
 from playwright.sync_api import sync_playwright
 from browser_smoke import make_page, trainer, PIN
 
+def assert_form_fields(page, selectors):
+    for selector in selectors:
+        field=page.locator(selector)
+        assert field.is_visible(), selector
+        size=field.evaluate('(field) => parseFloat(getComputedStyle(field).fontSize)')
+        assert size>=16, (selector,size)
+    assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+
 with sync_playwright() as playwright:
     browser = playwright.chromium.launch(
         executable_path=os.environ.get('CHROMIUM_EXECUTABLE') or None,
         headless=True, args=['--no-sandbox'])
-    for width in (375, 430):
+    for width in (320, 375, 430):
         page, errors = make_page(browser, viewport_width=width, mobile=True)
         page.set_viewport_size({'width':width,'height':600})
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера',exact=True)
-        assert version.inner_text()=='v. 0.3.3'
+        assert version.inner_text()=='v. 0.3.4'
         assert login.count()==0
         page.get_by_role('tab',name='Новая тренировка').click()
         page.get_by_role('button',name='Настройки',exact=True).click()
@@ -30,7 +38,12 @@ with sync_playwright() as playwright:
             'Тренировка','Анимация запуска','Название профиля','Обменяться данными',
             'Добавить архивный результат','Выборочно удалить данные']
         assert page.get_by_label('Имя (указывается в файле выгрузки)',exact=True).is_visible()
-        page.locator('#profile-name').fill('Черновик')
+        assert_form_fields(page,['#profile-name','#archive-date','#archive-time','#mode-select'])
+        date=page.locator('#archive-date').bounding_box()
+        time=page.locator('#archive-time').bounding_box()
+        assert abs(date['x']-time['x'])<1 and abs(date['width']-time['width'])<1
+        page.locator('#profile-name').fill('Длинное имя спортивного профиля для проверки')
+        assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
         page.get_by_role('link', name='Интерфейс тренера', exact=True).click()
         assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
         assert page.evaluate('scrollY')==0
@@ -39,8 +52,9 @@ with sync_playwright() as playwright:
         assert page.get_by_role('button', name='Настройки', exact=True).count() == 0
         page.get_by_role('button', name='Назад', exact=True).click()
         assert page.get_by_role('button', name='Звук', exact=True).is_visible()
-        assert page.locator('#profile-name').input_value()=='Черновик'
+        assert page.locator('#profile-name').input_value()=='Длинное имя спортивного профиля для проверки'
         trainer(page)
+        assert_form_fields(page,['#new-athlete','#work-rest','#trainer-a','#archive-date','#archive-time'])
         page.on('dialog',lambda dialog: dialog.accept())
         page.get_by_role('button',name='Удалить все локальные данные',exact=True).click()
         page.get_by_role('tab',name='История',exact=True).wait_for()
@@ -57,7 +71,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='v. 0.3.3'
+        assert footer.locator('.app-version').inner_text()=='v. 0.3.4'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

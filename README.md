@@ -1,6 +1,6 @@
-# sidesteps v0.3.3 — стабильный выпуск
+# sidesteps v0.3.4 — стабильный выпуск
 
-Версия v0.3.3 принята владельцем 24 ноября 2026 года.
+Версия v0.3.4 принята владельцем 24 ноября 2026 года.
 Приложение: https://t39s.github.io/sidesteps/
 Preview: https://t39s.github.io/sidesteps/preview/
 
