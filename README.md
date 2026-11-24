@@ -1,4 +1,4 @@
-# sidesteps v0.3.4-rc.2 — Preview
+# sidesteps v0.3.4-rc.3 — Preview
 
 Preview проверяет общий минимальный размер шрифта полей формы. Основной сайт использует v0.3.3.
 Приложение: https://t39s.github.io/sidesteps/
