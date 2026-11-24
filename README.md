@@ -1,6 +1,6 @@
-# sidesteps v0.3.3 — стабильный выпуск
+# sidesteps v0.3.4-rc.1 — Preview
 
-Версия v0.3.3 принята владельцем 24 ноября 2026 года.
+Preview проверяет общий минимальный размер шрифта полей формы. Основной сайт использует v0.3.3.
 Приложение: https://t39s.github.io/sidesteps/
 Preview: https://t39s.github.io/sidesteps/preview/
 

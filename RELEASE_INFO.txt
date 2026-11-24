@@ -1,8 +1,6 @@
-sidesteps v0.3.3
+sidesteps v0.3.4-rc.1
 Release date: 2026-11-24
-Status: STABLE — accepted by owner 2026-11-24
-Branch: main
-Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
-Accepted candidate: v0.3.3-rc.10, be5e1c5f456a72d88e33bb1218ee7fc28b464313
-Default modes: working 20 intervals, test 4 intervals, test stopwatch; rest 120/20 seconds; minimum tap gap 500 ms.
-Changes: training modes and coach settings, archive statistics, athlete settings, and coach entry.
+Status: RELEASE CANDIDATE — owner acceptance pending
+Branch: develop
+Stable baseline: v0.3.3, main 36d7f20ba4c9cf9c67806c944effd5738cf41114
+Changes: minimum 16px font size for form fields in athlete and coach interfaces.
