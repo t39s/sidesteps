@@ -318,13 +318,15 @@ def test_frozen_test_workout_after_settings_and_reload(browser):
     p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
     new_exercise(p,attempts=2,mode='test-intervals')
     for _ in range(4):tap(p)
-    trainer(p)
-    p.locator('#test-count').fill('5');p.locator('#test-rest').fill('1')
-    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
     assert state(p)['workouts'][0]['measurementPlan']['targetIntervals']==3
     assert state(p)['workouts'][0]['measurementPlan']['restDurationSec']==30
-    p.get_by_role('link',name='Интерфейс спортсмена',exact=True).click()
     saved=p.evaluate('window.__dump()');p.close()
+    # Entry to the trainer interface is unavailable during a personal workout.
+    # Seed newer device settings to exercise recovery of the existing workout plan.
+    key='sidesteps:trainer-settings:v1'
+    settings=json.loads(saved[key])
+    settings.update(testIntervalCount=5,testRestDurationSec=1)
+    saved[key]=json.dumps(settings)
     q,errs=make_page(browser,saved,viewport_width=375,mobile=True)
     clock=q.locator('[data-rest-clock]').inner_text()
     assert int(clock.split(':')[1])>10,clock
