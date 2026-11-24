@@ -81,7 +81,7 @@ test('personal profile rename preserves identity and history in export and reloa
   await p.api.handleAction('settings');
   assert.match(p.html(),/Тренировка[\s\S]*Название профиля[\s\S]*Обменяться данными/);
   p.nodes['profile-name']={value:'  Моё имя  '};
-  await p.api.handleAction('settings-save',{dataset:{id:s.athletes[1].id}});
+  await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
   const out=p.api.exportSnapshot();
   assert.equal(out.athletes[0].id,s.baseProfileId);
   assert.equal(out.athletes[0].name,'Моё имя');
@@ -98,7 +98,7 @@ test('personal profile rename rejects invalid input and failed writes atomically
     const before=p.data.get(M.KEY);
     p.nodes['profile-name']={value};
     if(value==='Новое имя')p.failWrite();
-    await p.api.handleAction('settings-save');
+    await p.api.handleAction('save-profile-name');
     assert.equal(p.data.get(M.KEY),before);
     assert.equal(p.api.state().athletes[0].name,'Спортсмен');
   }
@@ -178,7 +178,7 @@ function longListsState(){
   }
   return M.endWorkout(s,pending.value.id).state;
 }
-test('settings draft saves profile and parameters together and cancellation writes nothing',async()=>{
+test('profile save is independent of saving or discarding workout settings',async()=>{
   const p=await page();await p.api.handleAction('settings');
   const before=p.data.get(M.KEY);
   p.appEvents.change({target:{id:'attempt-count',value:'1'}});
@@ -194,22 +194,30 @@ test('settings draft saves profile and parameters together and cancellation writ
   p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
   p.appEvents.change({target:{name:'launch-animation',value:'none'}});
   p.appEvents.input({target:{id:'profile-name',value:'Новое имя'}});
+  await p.api.handleAction('save-profile-name');
+  assert.equal(p.api.state().device.soloPlannedAttempts,2);
+  await p.api.handleAction('settings-back');
+  assert.equal(p.api.state().athletes[0].name,'Новое имя');
+  await p.api.handleAction('settings');
+  p.appEvents.change({target:{id:'attempt-count',value:'1'}});
+  p.appEvents.change({target:{id:'mode-select',value:'stopwatch'}});
+  p.appEvents.change({target:{name:'launch-animation',value:'none'}});
+  p.appEvents.input({target:{id:'profile-name',value:''}});
   await p.api.handleAction('settings-save');
   const saved=p.api.state();
   assert.equal(saved.athletes[0].name,'Новое имя');assert.equal(saved.device.soloPlannedAttempts,1);
   assert.equal(saved.device.soloMeasurementMode,'stopwatch');assert.equal(saved.device.launchAnimation,'none');
   assert.equal(p.api.screen(),'athlete');
 });
-test('invalid name and failed write cannot partially apply settings',async()=>{
-  for(const quota of [false,true]){
-    const p=await page();await p.api.handleAction('settings');const before=p.data.get(M.KEY);
-    p.appEvents.change({target:{id:'attempt-count',value:'1'}});
-    p.appEvents.input({target:{id:'profile-name',value:quota?'Новое имя':''}});
-    if(quota)p.failWrite();
-    await p.api.handleAction('settings-save');
-    assert.equal(p.data.get(M.KEY),before);assert.equal(p.api.state().device.soloPlannedAttempts,2);
-    assert.equal(p.api.screen(),'settings');
-  }
+test('failed workout settings write retains the old values and keeps the settings open',async()=>{
+  const p=await page();await p.api.handleAction('settings');
+  const before=p.data.get(M.KEY);
+  p.appEvents.change({target:{id:'attempt-count',value:'1'}});
+  p.failWrite();
+  await p.api.handleAction('settings-save');
+  assert.equal(p.data.get(M.KEY),before);
+  assert.equal(p.api.state().device.soloPlannedAttempts,2);
+  assert.equal(p.api.screen(),'settings');
 });
 test('archive, management, history and interrupted lists expand independently and retain state after deletion',async()=>{
   const s=longListsState(),p=await page({[M.KEY]:JSON.stringify(s)}),aid=s.baseProfileId;
@@ -242,6 +250,7 @@ test('draft survives list toggles and saving uses current history after explicit
   assert.match(p.html(),/value="Имя после сохранения"/);
   p.nodes['archive-date']={value:'2026-11-20'};p.nodes['archive-time']={value:'3,123'};
   await p.api.handleAction('add-archive');
+  await p.api.handleAction('save-profile-name');
   await p.api.handleAction('settings-save');
   assert.equal(p.api.state().archived.length,8);assert.equal(p.api.state().archived.at(-1).bestMs,3123);
   assert.equal(p.api.state().athletes[0].name,'Имя после сохранения');
@@ -283,4 +292,31 @@ test('failed archive statistics settings write retains previous calculations and
   await p.api.handleAction('save-trainer-settings');
   assert.equal(p.data.get(M.KEY),before);assert.equal(p.data.get(M.SETTINGS_KEY),settings);
   assert.equal(p.api.statsPoints(s.baseProfileId).length,7);assert.notEqual(p.api.settings().includeArchiveStats,true);
+});
+
+test('full reset clears trainer choices and allows the working count to be chosen after reload',async()=>{
+  const config=require('../config.json');
+  const defaults=M.defaultTrainerSettings(config,false);
+  const previous=M.changeTrainerSettings(defaults,{workingIntervalCount:30,includeArchiveStats:true,testIntervalCount:3,workRestDurationSec:99},true);
+  const model=M.addArchived(M.blank(),'athlete-default','2026-11-01',800).state;
+  const initial={[M.KEY]:JSON.stringify(model),[M.SETTINGS_KEY]:JSON.stringify(previous)};
+  const cancelled=await page(initial,{confirm:false});
+  cancelled.api.unlock();await cancelled.api.handleAction('reset-all');
+  assert.equal(cancelled.data.get(M.SETTINGS_KEY),initial[M.SETTINGS_KEY]);
+  assert.equal(cancelled.api.state().archived.length,1);
+  const p=await page(initial);
+  p.api.unlock();await p.api.handleAction('reset-all');
+  assert.deepEqual(p.api.settings(),defaults);
+  assert.equal(p.api.state().archived.length,0);
+  assert.equal(p.api.authorized(),false);
+  const q=await page(Object.fromEntries(p.data));
+  assert.deepEqual(JSON.parse(q.data.get(M.SETTINGS_KEY)),defaults);
+  q.api.unlock();await q.api.handleAction('pin');
+  q.nodes['working-count']={value:'27'};
+  q.nodes['test-count']={value:'4'};
+  q.nodes['work-rest']={value:'120'};
+  q.nodes['test-rest']={value:'20'};
+  await q.api.handleAction('save-trainer-settings');
+  assert.equal(q.api.settings().workingIntervalCount,27);
+  assert.equal(q.api.settings().workingCountLocked,true);
 });

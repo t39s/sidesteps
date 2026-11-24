@@ -12,7 +12,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера',exact=True)
-        assert version.inner_text()=='v. 0.3.3-rc.8'
+        assert version.inner_text()=='v. 0.3.3-rc.9'
         assert login.inner_text()=='Интерфейс тренера'
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
@@ -35,7 +35,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='v. 0.3.3-rc.8'
+        assert footer.locator('.app-version').inner_text()=='v. 0.3.3-rc.9'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

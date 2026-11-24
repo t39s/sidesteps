@@ -212,7 +212,7 @@ def test_personal_data_management(browser):
     assert p.get_by_role('heading',name='Выборочно удалить данные').evaluate('(e)=>getComputedStyle(e).color')=='rgb(250, 143, 150)'
     before_name=state(p)
     p.get_by_label('Имя (указывается в файле выгрузки)',exact=True).fill('Личный профиль')
-    p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    p.get_by_role('button',name='Сохранить',exact=True).click()
     assert state(p)['athletes'][0]['name']=='Личный профиль'
     assert state(p)['athletes'][0]['id']==aid
     for field in ('workouts','attempts','archived','childSessions'):
@@ -391,7 +391,17 @@ def test_settings_draft_and_bounded_lists(browser):
         assert state(p)['device']['soloPlannedAttempts']==2
         assert archive.locator(':scope > .history-item').count()==6
         p.get_by_role('button',name='Настройки',exact=True).click()
+        actions=p.locator('.settings-actions')
+        save,discard=[button.bounding_box() for button in actions.get_by_role('button').all()]
+        assert abs(save['y']-discard['y'])<1
+        assert save['y']<p.locator('#profile-name').bounding_box()['y']
+        date=p.locator('#archive-date').bounding_box()
+        time=p.locator('#archive-time').bounding_box()
+        assert abs(date['x']-time['x'])<1 and abs(date['width']-time['width'])<1
+        assert date['y']>=p.locator('label[for="archive-date"] span').bounding_box()['y']+p.locator('label[for="archive-date"] span').bounding_box()['height']
         p.locator('#profile-name').fill('Сохранено')
+        p.get_by_role('button',name='Сохранить',exact=True).click()
+        p.locator('#profile-name').fill('Несохранённое имя')
         p.locator('#attempt-count').select_option('1')
         p.locator('#mode-select').select_option('stopwatch')
         p.get_by_role('button',name='Сохранить настройки',exact=True).click()
@@ -401,6 +411,8 @@ def test_settings_draft_and_bounded_lists(browser):
         p.get_by_role('tab',name='Новая тренировка',exact=True).click()
         p.get_by_role('button',name='Настройки',exact=True).click()
         assert p.locator('#profile-name').count()==0
+        save,discard=[button.bounding_box() for button in p.locator('.settings-actions').get_by_role('button').all()]
+        assert abs(save['y']-discard['y'])<1
         assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
         assert not errors+errs,errors+errs
         p.close()
