@@ -1,6 +1,6 @@
-sidesteps v0.3.4-rc.1
+sidesteps v0.3.4-rc.2
 Release date: 2026-11-24
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.3, main 36d7f20ba4c9cf9c67806c944effd5738cf41114
-Changes: minimum 16px font size for form fields in athlete and coach interfaces.
+Changes: opt-in viewport measurements for the archive time field in Preview.

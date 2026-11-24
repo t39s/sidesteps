@@ -3,7 +3,7 @@ const get=p=>fs.readFileSync(path.join(__dirname,'..',p),'utf8');
 test('athlete footer centers coach link above version',()=>{
   const app=get('app.js');
   assert.match(app,/athlete-footer/);
-  assert.match(app,/app-version">v\. 0\.3\.4-rc\.1/);
+  assert.match(app,/app-version">v\. 0\.3\.4-rc\.2/);
   assert.match(app,/\$\{showAdminLogin\?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера<\/a>/);
   assert.match(get('styles.css'),/\.athlete-footer\{[^}]*flex-direction:column/);
   assert.doesNotMatch(app,/Данные хранятся на этом устройстве|b\('Тренер','pin'/);
