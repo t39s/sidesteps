@@ -144,3 +144,5 @@ body.trainer-theme{background:#321B27}
 .archive-field>input{width:100%;min-width:0;max-width:100%;box-sizing:border-box}
 .archive-field>input[type=date]{-webkit-appearance:none;appearance:none}
 .archive-field>input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1em}
+
+#pin-input{font-size:16px}

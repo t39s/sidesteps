@@ -1,7 +1,7 @@
-sidesteps v0.3.3-rc.9
+sidesteps v0.3.3-rc.10
 Release date: 2026-11-24
 Status: RELEASE CANDIDATE — owner acceptance pending
 Branch: develop
 Stable baseline: v0.3.2, main 41f1c6ac3c5a18911002edfffc93ef7ca0549fa4
 Default modes: working 20 intervals, test 4 intervals, test stopwatch; rest 120/20 seconds; minimum tap gap 500 ms.
-Changes: full local reset restores unlocked trainer defaults; independent profile name save; settings buttons side by side; aligned native date and time fields.
+Changes: trainer login link in History settings; scroll to top for role transitions; 16px PIN input.

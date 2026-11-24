@@ -2,7 +2,7 @@
 import os,json,threading,http.server,functools
 from pathlib import Path
 from playwright.sync_api import sync_playwright
-from browser_smoke import make_page,trainer,new_exercise,tap,PIN
+from browser_smoke import make_page,trainer,open_trainer_login,new_exercise,tap,PIN
 ROOT=Path(__file__).resolve().parents[1]
 KEY='interval-lab:data:v6'
 OLD='interval-lab:data:v5'
@@ -136,7 +136,7 @@ def test_http_pwa(browser):
         p.goto(url);p.get_by_role('tab',name='История').wait_for()
         assert p.evaluate('isSecureContext&&!!crypto.subtle')
         # Native PBKDF2 rejects wrong PIN; production verifier unchanged.
-        p.get_by_role('link',name='Интерфейс тренера',exact=True).click();p.locator('#pin-input').fill('wrong')
+        open_trainer_login(p);p.locator('#pin-input').fill('wrong')
         p.get_by_role('button',name='Войти',exact=True).click();p.get_by_text('Неверный PIN',exact=True).wait_for()
         p.get_by_role('button',name='Назад',exact=True).click()
         p.evaluate('navigator.serviceWorker.ready');p.wait_for_function('!!navigator.serviceWorker.controller')
