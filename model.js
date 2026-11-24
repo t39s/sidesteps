@@ -38,6 +38,9 @@
     for(const key of ['workRestDurationSec','testRestDurationSec'])assert(Number.isInteger(value[key])&&value[key]>=0&&value[key]<=600,'Отдых: целое 0–600 секунд');
     assert(typeof value.workingCountLocked==='boolean','Некорректная фиксация рабочего числа');
     assert(value.includeArchiveStats===undefined||typeof value.includeArchiveStats==='boolean','Некорректный выбор данных для статистики');
+    for(const key of ['showAthleteHistoryDelete','showTrainerHistoryDelete']){
+      assert(value[key]===undefined||typeof value[key]==='boolean','Некорректная настройка удаления в истории');
+    }
     return value;
   }
   function defaultTrainerSettings(config,existing=false){

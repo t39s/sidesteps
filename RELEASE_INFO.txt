@@ -1,7 +1,6 @@
-sidesteps v0.3.4
-Release date: 2026-11-24
-Status: STABLE — accepted by owner 2026-11-24
-Branch: main
-Stable baseline: v0.3.3, main afd0899f6984ad8887d71157f3b01d4e58f61c9b
-Accepted candidate: v0.3.4-rc.3, 13d87b1169576287c7c977469c5b2b5a2d6409cb
-Changes: minimum 16px form text and limited visibility of the athlete interface link in coach mode.
+sidesteps v0.3.5-rc.1
+Candidate date: 2026-11-24
+Status: PREVIEW
+Branch: develop
+Stable baseline: v0.3.4, 3de9a1d63975aec4a9d00ca54714ea328bf76c3e
+Changes: view, add archive results and delete records in History; independent delete controls for athlete and trainer.

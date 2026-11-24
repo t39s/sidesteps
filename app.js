@@ -98,6 +98,27 @@ function initTrainerSettings(existing){
   trainerSettingsState=savedSettingsBytes?M.validateTrainerSettings(JSON.parse(savedSettingsBytes)):M.defaultTrainerSettings(config,existing);
   if(!savedSettingsBytes)writeTrainerSettings(trainerSettingsState);
 }
+function historySettingsKey(){
+  return db.device.lastInterface==='trainer'?'showTrainerHistoryDelete':'showAthleteHistoryDelete';
+}
+function historyDeleteEnabled(){return trainerSettings()[historySettingsKey()]===true;}
+function managedHistoryAthlete(){
+  if(db.device.lastInterface==='athlete'&&['athlete','history'].includes(screen))return currentAthlete();
+  if(db.device.lastInterface==='trainer'&&trainerUnlocked&&screen==='history')return trainerHistoryAthlete();
+  return null;
+}
+function trainerHistoryAthlete(){
+  return db.athletes.some(a=>a.id===db.device.viewAthleteId)?db.device.viewAthleteId:db.athletes[0].id;
+}
+function historyDeletionSettings(){
+  return card('<h2>История</h2><label class="statistics-option"><input id="show-history-delete" type="checkbox" role="switch" '+(historyDeleteEnabled()?'checked':'')+'>Показывать кнопки удаления в Истории</label>');
+}
+function historyDeleteButton(action,id,label='Удалить тренировку'){
+  return b(label,action,'danger small',`data-id="${esc(id)}"`);
+}
+function workoutDeleteButton(workout){
+  return historyDeleteButton('delete-workout',workout.id);
+}
 function lockWorkingCount(plan){
   if(plan.purpose!=='working')return;
   if(!trainerSettings().workingCountLocked)writeTrainerSettings({...trainerSettings(),workingCountLocked:true});
@@ -369,17 +390,13 @@ function workoutSummary(athleteId,workout,heading=false){
   if(workout&&!working)return `${title}<p class="note">${archiveSource(workout)} · сохранено в архив</p>${best!==null?row('Лучшее время',M.fmt(best)):''}`;
   return `${title}${best!==null&&best!==undefined?`<div class="metric"><span>Лучшее время</span><strong>${recordTime(best,athleteId,attempts.some(a=>isRecord(a)))}</strong></div>`:''}${attempts.some(a=>isRecord(a))?'<div class="record">★ Новый рекорд!</div>':''}${improvements.length?`<div class="note">Улучшение на ${M.fmt(Math.max(...improvements.map(a=>a.previousRecordMs-a.totalMs)))}</div>`:''}${record!==null?row(firstOnly?'Исходный результат':'Рекорд',M.fmt(record)):''}`;
 }
-function progress(athleteId,child=false,separate=false){
+function progress(athleteId,canDelete){
   const last=M.publicWorkouts(db,athleteId).at(-1);
   const points=statsPoints(athleteId);
-  const summary=workoutSummary(athleteId,last,separate);
-  const chart='<h2>Мой прогресс</h2>'+statsNote()+graphic(points,separate);
-  const workouts=historyItems(athleteId,child,separate),archives=archiveHistory(athleteId);
-  if(separate){
-    const latest=card(summary+(last?workoutDetails(last,statsBest(last),true,true):''));
-    return (db.device.lastInterface==='athlete'?card(chart)+latest:latest+card(chart))+card(workouts)+archives;
-  }
-  return card(`${summary}<div class="progress-chart">${chart}</div>${workouts}`)+archives;
+  const summary=workoutSummary(athleteId,last,true);
+  const chart=card('<h2>Мой прогресс</h2>'+statsNote()+graphic(points,true));
+  const latest=card(last?`<div data-history-workout="${esc(last.id)}">${summary}${workoutDetails(last,statsBest(last),true,true,false,canDelete)}${canDelete?workoutDeleteButton(last):''}</div>`:summary);
+  return (db.device.lastInterface==='athlete'?chart+latest:latest+chart)+card(historyItems(athleteId,canDelete))+archiveHistory(athleteId,canDelete);
 }
 
 function intervalDetails(a,sharedMax){if(a.mode!=='intervals'||!a.intervalsMs?.length)return '';const max=sharedMax??Math.max(...a.intervalsMs);return `<details><summary>Время каждого интервала (${a.intervalsMs.length})</summary><div class="stack">${a.intervalsMs.map((ms,i)=>`<div><div class="row between small"><span>Интервал ${i+1}</span><strong>${M.fmt(ms)}</strong></div><div style="height:8px;border-radius:4px;background:#0e2033;overflow:hidden"><div style="height:100%;background:#83def3;width:${(ms/Math.max(1,max)*100).toFixed(1)}%"></div></div></div>`).join('')}</div></details>`;}
@@ -408,36 +425,39 @@ function workoutComments(workout,editable){
   return fields.some(([field])=>canEdit(field))
     ?`<form class="workout-comments" data-workout-id="${esc(workout.id)}">${content}<div class="buttons"><button type="submit" class="small">Сохранить комментарии</button></div></form>`:content;
 }
-function workoutDetails(workout,best,sharedScale,editable=false,archiveOnly=false){
+function workoutDetails(workout,best,sharedScale,editable=false,archiveOnly=false,canDelete=false){
   const all=M.completed(db,workout);
   const attempts=archiveOnly?all.filter(a=>!M.isWorkingAttempt(db,a)):includeArchiveStats()?all:M.workingCompleted(db,workout).length?M.workingCompleted(db,workout):all;
   const intervals=sharedScale?attempts.flatMap(a=>a.mode==='intervals'?(a.intervalsMs??[]):[]):[];
   const sharedMax=sharedScale?Math.max(1,...intervals):undefined;
-  return `<details><summary>Подробнее</summary><div class="note">${esc(M.datetime(workout.createdAt))}</div>${attempts.map(a=>row(`Попытка ${a.ordinal}`,((includeArchiveStats()||M.isWorkingAttempt(db,a))?recordTime(a.totalMs,a.athleteId,isRecord(a)):M.fmt(a.totalMs))+(attempts.length>1&&a.totalMs===best&&!isRecord(a)&&a.totalMs!==recordAsOf(a.athleteId)?'<span aria-label="Лучшая попытка"> ★</span>':''))+intervalDetails(a,sharedMax)).join('')}${workoutComments(workout,editable)}</details>`;
+  const mayDeleteAttempt=canDelete&&(trainerUnlocked||all.length>1);
+  const attemptAction=a=>mayDeleteAttempt&&(archiveOnly||M.isWorkingAttempt(db,a)||workout.status!=='completed')
+    ?historyDeleteButton('delete-attempt',a.id,'Удалить попытку'):'';
+  return `<details><summary>Подробнее</summary><div class="note">${esc(M.datetime(workout.createdAt))}</div>${attempts.map(a=>row(`Попытка ${a.ordinal}`,((includeArchiveStats()||M.isWorkingAttempt(db,a))?recordTime(a.totalMs,a.athleteId,isRecord(a)):M.fmt(a.totalMs))+(attempts.length>1&&a.totalMs===best&&!isRecord(a)&&a.totalMs!==recordAsOf(a.athleteId)?'<span aria-label="Лучшая попытка"> ★</span>':''))+attemptAction(a)+intervalDetails(a,sharedMax)).join('')}${workoutComments(workout,editable)}</details>`;
 }
 function archiveSource(w){
   const a=M.completed(db,w).find(a=>!M.isWorkingAttempt(db,a));
   if(a?.mode==='stopwatch')return 'Старт–Стоп · тест';
   return a?`${intervalCountLabel(a.targetIntervals)} · ${w.measurementPlan?.purpose==='test'||a.targetIntervals===4?'тест':'архив'}`:'Архив';
 }
-function archiveHistory(aid){
+function archiveHistory(aid,canDelete=false){
   const entries=M.archivedWorkouts(db,aid).map(w=>({date:w.createdAt,id:w.id,
-    html:`<div class="history-item" data-archive-workout="${esc(w.id)}"><span>Тренировка ${esc(M.datetime(w.createdAt))}</span><p class="note">${archiveSource(w)}</p><strong>${includeArchiveStats()?recordTime(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)),aid,M.completed(db,w).some(a=>!M.isWorkingAttempt(db,a)&&isRecord(a))):M.fmt(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)))}</strong>${workoutDetails(w,M.best(db,w),true,true,true)}</div>`}));
+    html:`<div class="history-item" data-archive-workout="${esc(w.id)}"${M.workingBest(db,w)===null?` data-history-workout="${esc(w.id)}"`:''}><span>Тренировка ${esc(M.datetime(w.createdAt))}</span><p class="note">${archiveSource(w)}</p><strong>${includeArchiveStats()?recordTime(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)),aid,M.completed(db,w).some(a=>!M.isWorkingAttempt(db,a)&&isRecord(a))):M.fmt(Math.min(...M.completed(db,w).filter(a=>!M.isWorkingAttempt(db,a)).map(a=>a.totalMs)))}</strong>${workoutDetails(w,M.best(db,w),true,true,true,canDelete)}${canDelete&&M.workingBest(db,w)===null?workoutDeleteButton(w):''}</div>`}));
   for(const a of db.archived.filter(a=>a.athleteId===aid))entries.push({date:a.date,id:a.id,
-    html:`<div class="history-item"><span>${esc(a.date)} · Ручной ввод · </span><strong>${includeArchiveStats()?recordTime(a.bestMs,aid):M.fmt(a.bestMs)}</strong></div>`});
+    html:`<div class="history-item" data-history-archive="${esc(a.id)}"><span>${esc(a.date)} · Ручной ввод · </span><strong>${includeArchiveStats()?recordTime(a.bestMs,aid):M.fmt(a.bestMs)}</strong>${canDelete?historyDeleteButton('delete-archived',a.id):''}</div>`});
   entries.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
   const key=`archive:${db.device.lastInterface}:${aid}`,list=boundedList(entries,key);
   return entries.length?card('<h2>Архивные тренировки</h2><div class="history-list" data-list-container="'+esc(key)+'">'+list.items.map(x=>x.html).join('')+list.control+'</div>','archive-history'):'';
 }
-function historyItems(aid,child=false,personal=false){
+function historyItems(aid,canDelete=false){
   const ordered=[...M.publicWorkouts(db,aid)].reverse(),total=ordered.length;
-  if(personal)ordered.shift();
-  const personalView=personal&&db.device.lastInterface==='athlete';
-  const key=`history:${db.device.lastInterface}:${aid}`,list=boundedList(ordered,key,{limit:personal?4:5,total});
-  return `<h2>${personalView?'Предыдущие тренировки':'Тренировки'}</h2>${!ordered.length?muted(personal?'Нет предыдущих тренировок':'Нет завершённых тренировок'):''}
+  ordered.shift();
+  const personalView=db.device.lastInterface==='athlete';
+  const key=`history:${db.device.lastInterface}:${aid}`,list=boundedList(ordered,key,{limit:4,total});
+  return `<h2>${personalView?'Предыдущие тренировки':'Тренировки'}</h2>${!ordered.length?muted('Нет предыдущих тренировок'):''}
     <div class="history-list" data-list-container="${esc(key)}">${list.items.map(w=>{
       const bs=statsBest(w);
-      return `<div class="history-item"><div class="row between"><span class="muted">${esc(M.date(w.createdAt))}</span><strong>${recordTime(bs,aid,M.completed(db,w).some(a=>isRecord(a)))}</strong></div>${workoutDetails(w,bs,personal,true)}</div>`;
+      return `<div class="history-item" data-history-workout="${esc(w.id)}"><div class="row between"><span class="muted">${esc(M.date(w.createdAt))}</span><strong>${recordTime(bs,aid,M.completed(db,w).some(a=>isRecord(a)))}</strong></div>${workoutDetails(w,bs,true,true,false,canDelete)}${canDelete?workoutDeleteButton(w):''}</div>`;
     }).join('')}${list.control}</div>`;
 }
 function historyScreen(){
@@ -446,26 +466,41 @@ function historyScreen(){
   const trainerHistory=mode==='child'||mode==='trainer';
   if(!trainerHistory)return header('',b('Назад','back-history','small'))+historyContent(aid);
   const ids=mode==='trainer'&&trainerUnlocked?db.athletes.map(a=>a.id):db.device.childParticipants;
-  const selected=ids.includes(aid)?aid:ids[0];
+  const selected=mode==='trainer'&&trainerUnlocked?trainerHistoryAthlete():ids.includes(aid)?aid:ids[0];
   return header('',b('Назад','back-history','small'))+
     athleteTabs(ids,selected,'history-profile')+profilePanel(selected,historyContent(selected,mode==='child',trainerUnlocked&&mode==='trainer'));
 }
 function historyContent(aid,child=false,trainer=false){
-  return `${progress(aid,child,true)}${trainer?interruptedAttempts(aid):''}${!child?legacyIncompleteList(aid):''}${trainer?adminHistory(aid):''}`;
+  const canManage=managedHistoryAthlete()===aid;
+  const canDelete=canManage&&historyDeleteEnabled();
+  return progress(aid,canDelete)+(canManage?interruptedAttempts(aid,canDelete):'')+
+    (!child?legacyIncompleteList(aid,canDelete):'')+(trainer?unfinishedHistory(aid,canDelete):'')+
+    (canManage?archiveForm():'');
 }
 
-function interruptedAttempts(aid,nested=false){
+function interruptedAttempts(aid,canDelete=false){
   const interrupt=db.attempts.filter(a=>a.athleteId===aid&&a.status==='interrupted')
     .sort((a,b)=>b.startedAt.localeCompare(a.startedAt)||b.id.localeCompare(a.id));
-  const heading=nested?'h3':'h2',key=`interrupted:${db.device.lastInterface}:${aid}`,list=boundedList(interrupt,key,{attempts:true});
-  const content=`<${heading}>Прерванные попытки</${heading}><div data-list-container="${esc(key)}">${interrupt.length?list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))}</span>${b('Удалить попытку','delete-interrupted','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')+list.control:muted('Прерванных попыток нет')}</div>`;
-  return nested?content:card(content);
+  if(!interrupt.length)return '';
+  const key=`interrupted:${db.device.lastInterface}:${aid}`,list=boundedList(interrupt,key,{attempts:true});
+  return card(`<h2>Прерванные попытки</h2><div data-list-container="${esc(key)}">${list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))}</span>${canDelete&&!M.currentChild(db)?.workoutIds.includes(a.workoutId)?historyDeleteButton('delete-interrupted',a.id,'Удалить попытку'):''}</div>`).join('')}${list.control}</div>`);
 }
-function legacyIncompleteList(aid){
+function legacyIncompleteList(aid,canDelete=false){
   const items=db.incomplete.filter(a=>a.athleteId===aid).sort((a,b)=>String(b.startedAt).localeCompare(String(a.startedAt))||b.id.localeCompare(a.id));
   if(!items.length)return '';
   const key=`incomplete:${db.device.lastInterface}:${aid}`,list=boundedList(items,key,{attempts:true});
-  return card('<h2>Ранее неполные попытки</h2><div data-list-container="'+esc(key)+'">'+list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))} · не зачтена</span>${b('Удалить попытку','delete-incomplete','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')+list.control+'</div>');
+  return card(`<h2>Ранее неполные попытки</h2><div data-list-container="${esc(key)}">${list.items.map(a=>`<div class="list-row"><span>${esc(M.datetime(a.startedAt))} · не зачтена</span>${canDelete?historyDeleteButton('delete-incomplete',a.id,'Удалить попытку'):''}</div>`).join('')}${list.control}</div>`);
+}
+function workoutOutsideActiveSession(id){return !M.currentChild(db)?.workoutIds.includes(id)&&db.device.activeWorkoutId!==id;}
+function unfinishedHistory(aid,canDelete){
+  const workouts=db.workouts.filter(w=>w.athleteId===aid&&w.status!=='completed')
+    .sort((a,b)=>b.createdAt.localeCompare(a.createdAt)||b.id.localeCompare(a.id));
+  if(!workouts.length)return '';
+  const key=`unfinished:${aid}`,list=boundedList(workouts,key);
+  return card(`<h2>Незавершённые тренировки</h2><div class="history-list" data-list-container="${esc(key)}">${list.items.map(w=>{
+    const deletable=canDelete&&workoutOutsideActiveSession(w.id);
+    return `<div class="history-item" data-history-workout="${esc(w.id)}"><span>Тренировка ${esc(M.datetime(w.createdAt))}</span>${M.completed(db,w).length?workoutDetails(w,M.best(db,w),true,false,false,deletable):''}${deletable?workoutDeleteButton(w):''}</div>`;
+  }).join('')}${list.control}</div>`);
 }
 function animationSettings(){
   const selected=launchAnimation();
@@ -483,51 +518,15 @@ function appSettings(){
     animationSettings()+
     `<div class="buttons settings-actions">${b('Сохранить настройки','settings-save','primary')}${b('Не сохранять','settings-back','nav-return')}</div>`+
     (fromPersonalHistory?card('<h2>Название профиля</h2><label>Имя (указывается в файле выгрузки)<input id="profile-name" maxlength="50" value="'+esc(settingsDraft.name)+'"></label><div class="buttons">'+b('Сохранить','save-profile-name','primary')+'</div>'):'')+
-    (fromPersonalHistory?
-      card('<h2>Обменяться данными</h2><div class="buttons">'+b('Выгрузить','export-json','wide')+b('Загрузить','import-json','wide')+'</div><p class="note center">Данные хранятся на&nbsp;устройстве.</p><input type="file" id="file-import" accept=".json,application/json" hidden>')+
-      archiveForm()+
-      card('<h2 class="deletion-title">Выборочно удалить данные</h2>'+interruptedAttempts(currentAthlete(),true)+
-        '<h3>Завершенные тренировки</h3>'+historyManagement(currentAthlete(),true)):''));
+    (fromPersonalHistory?historyDeletionSettings()+
+      card('<h2>Обменяться данными</h2><div class="buttons">'+b('Выгрузить','export-json','wide')+b('Загрузить','import-json','wide')+'</div><p class="note center">Данные хранятся на&nbsp;устройстве.</p><input type="file" id="file-import" accept=".json,application/json" hidden>'):''));
 }
-function archiveForm(options=''){
+function archiveForm(){
   return card('<h2>Добавить архивный результат</h2>'+
-    (options?'<label>Спортсмен<select id="archive-athlete">'+options+'</select></label>':'')+
     '<p class="note">Ручной ввод. '+(includeArchiveStats()?'Учитывается в рекорде, среднем и прогрессе.':'Не учитывается в рекорде, среднем и прогрессе.')+'</p><label class="archive-field" for="archive-date"><span>Дата</span><input type="date" id="archive-date"></label>'+
     '<label class="archive-field" for="archive-time"><span>Время, секунды</span><input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label>'+
-    '<div class="buttons">'+b('Добавить в архив','add-archive',options?'primary wide':'primary')+'</div>');
+    '<div class="buttons">'+b('Добавить в архив','add-archive','primary')+'</div>');
 }
-function historyManagement(aid,completedOnly=false){
-  const workouts=db.workouts.filter(w=>w.athleteId===aid&&(!completedOnly||w.status==='completed'));
-  const rows=workouts.map(w=>{
-    const attempts=M.completed(db,w);
-    const content=completedOnly&&attempts.length===1
-      ?`<div class="list-row"><strong>${M.fmt(attempts[0].totalMs)}</strong></div>`
-      :`<details><summary>Попытки (${attempts.length})</summary>
-        ${attempts.map(a=>`<div class="list-row"><span>Попытка ${a.ordinal} · ${M.fmt(a.totalMs)}</span>
-          ${b('Удалить попытку','delete-attempt','danger small',`data-id="${esc(a.id)}"`)}</div>`).join('')}
-        </details>`;
-    return {date:w.createdAt,id:w.id,html:`<div class="history-item" data-history-workout="${esc(w.id)}">
-      <div class="list-row"><span>Тренировка ${esc(M.datetime(w.createdAt))}</span>
-      ${b('Удалить тренировку','delete-workout','danger small',`data-id="${esc(w.id)}"`)}</div>
-      ${content}</div>`};
-  });
-  for(const a of db.archived.filter(x=>x.athleteId===aid)){
-    const content=completedOnly
-      ?`<div class="list-row"><strong>${M.fmt(a.bestMs)}</strong></div>`
-      :`<details><summary>Попытки (1)</summary><div class="list-row">
-        <span>Архивная попытка · ${M.fmt(a.bestMs)}</span>
-        ${b('Удалить попытку','delete-archived','danger small',`data-id="${esc(a.id)}"`)}
-        </div></details>`;
-    rows.push({date:a.date,id:a.id,html:`<div class="history-item" data-history-archive="${esc(a.id)}">
-      <div class="list-row"><span>Архивная тренировка ${esc(a.date)}</span>
-      ${b('Удалить тренировку','delete-archived','danger small',`data-id="${esc(a.id)}"`)}</div>
-      ${content}</div>`});
-  }
-  rows.sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
-  const key=`manage:${db.device.lastInterface}:${aid}`,list=boundedList(rows,key);
-  return '<div data-list-container="'+esc(key)+'">'+(rows.length?list.items.map(row=>row.html).join('')+list.control:muted('Завершённых тренировок нет'))+'</div>';
-}
-function adminHistory(aid){return card('<h2>Управление историей</h2>'+historyManagement(aid));}
 function trainerAthleteRow(profile){
   const id=esc(profile.id),name=esc(profile.name),attrs=`data-id="${id}"`;
   return `<div class="athlete-row">
@@ -563,11 +562,11 @@ function setAthleteRenameOpen(row,open){
 }
 function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)}</option>`).join('');const title=header('Тренер',b('К занятию','go-child','small'))+`<h1 class="hero-title">Управление занятием</h1>`;if(c)return title+card(`<h2>Занятие идёт</h2><p>${c.athleteIds.map(id=>esc(athlete(id).name)).join(' → ')}</p><p>Следующая попытка: ${c.nextIndex+1} из ${c.sequence.length}</p>${b('Вернуться к занятию','go-child','primary wide')}<div class="buttons">${b('Принудительно завершить','force-child','danger wide')}</div>`);
   if(additionalSolo())return title+card('<h2>Незавершённая тренировка</h2><p>'+esc(athlete(activeSolo().athleteId).name)+'</p>'+b('Продолжить незавершённую тренировку','resume-additional-solo','wide'));
-  return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(trainerAthleteRow).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div>`)+permanentTrainerSettings()+archiveForm(options)+card(`<h2>Резервные копии</h2><div class="buttons backup-actions">${b('Выгрузить','export-json')} ${b('Загрузить','import-json')} ${b('Удалить все локальные данные','reset-all','danger wide')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
+  return title+card(`<h2>Подготовить занятие</h2><label>Участник А<select id="trainer-a">${options}</select></label><label>Участник Б<select id="trainer-b"><option value="">Нет — один участник</option>${options}</select></label>${chooseAttempts()}${chooseMode()}<div class="buttons">${b('Начать занятие','start-child','primary wide')}</div>`)+card(`<h2>Спортсмены</h2>${db.athletes.map(trainerAthleteRow).join('')}<label>Добавить спортсмена<input id="new-athlete" maxlength="50" placeholder="Имя"></label><div class="buttons">${b('Добавить','add-athlete','primary')}</div>`)+permanentTrainerSettings()+historyDeletionSettings()+card(`<h2>Резервные копии</h2><div class="buttons backup-actions">${b('Выгрузить','export-json')} ${b('Загрузить','import-json')} ${b('Удалить все локальные данные','reset-all','danger wide')}</div><input id="file-import" type="file" accept=".json,application/json" hidden>`);
 }
 function baseChoice(source,action,personal=false){return card('<h1>'+(personal?'Выберите профиль для загрузки':'Выберите базовый профиль')+'</h1><label>Профиль<select id="base-choice">'+source.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${source.workouts.filter(w=>w.athleteId===a.id).length} тренировок · ${source.archived.filter(w=>w.athleteId===a.id).length} архивных результатов</option>`).join('')+'</select></label><p>'+(personal?'Будет загружен только выбранный профиль.':'Этот профиль будет доступен без PIN.')+'</p>'+b(personal?'Загрузить профиль':'Назначить базовым',action,'primary wide'));}
 function pinScreen(){return header('','',false,'',false)+card(`<h2>Вход в интерфейс тренера</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного Тренером, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAthleteExit=trainerUnlocked&&!renderError&&['trainer','history','child-final'].includes(screen);const showAdminLogin=!trainerUnlocked&&!renderError&&screen==='settings'&&settingsHaveProfileName();app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.4</span>${showAthleteExit?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
+function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAthleteExit=trainerUnlocked&&!renderError&&['trainer','history','child-final'].includes(screen);const showAdminLogin=!trainerUnlocked&&!renderError&&screen==='settings'&&settingsHaveProfileName();app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.5-rc.1</span>${showAthleteExit?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showAdminLogin?'<a href="#admin-login" data-act="pin" title="Для Тренера" aria-label="Интерфейс тренера">Интерфейс тренера</a>':''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
@@ -822,9 +821,7 @@ async function handleAction(name,button){try{
  case 'child-view':{if(M.currentChild(db))return;let aid=button.dataset.id;if(!db.device.childParticipants.includes(aid))return;change(n=>{n.device.viewAthleteId=aid;});go('child-final');app.querySelector('[role="tab"][aria-selected="true"]')?.focus();return;}
  case 'trainer-history':{if(!trainerUnlocked)return;const aid=button.dataset.id;change(n=>{n.device.viewAthleteId=aid;});returnFromHistory='trainer';go('history');return;}
  case 'add-archive':{
-   const trainerForm=trainerUnlocked&&screen==='trainer';
-   if(!trainerForm&&!(screen==='settings'&&db.device.lastInterface==='athlete'))return;
-   const aid=trainerForm?$('archive-athlete').value:currentAthlete();
+   const aid=managedHistoryAthlete();if(!aid)return;
    const day=$('archive-date').value;
    const raw=$('archive-time').value.trim().replace(',','.');
    const num=Number(raw);
@@ -896,31 +893,39 @@ async function handleAction(name,button){try{
    const counts=['workouts','attempts','archived','incomplete'].map(k=>`${k}: ${db[k].filter(x=>x.athleteId===aid).length}`).join(', ');
    if(!window.confirm('Удалить профиль и ВСЮ его историю? '+counts+(replacement?' Новый базовый: '+athlete(replacement).name:'')))return;
    operate(s=>M.deleteProfileAndRebase(s,aid,replacement,true));render();return;}
- case 'delete-incomplete':{if(!window.confirm('Удалить неполную попытку?'))return;const found=db.incomplete.find(a=>a.id===button.dataset.id);if(!trainerUnlocked&&found?.athleteId!==currentAthlete())return;operate(s=>M.deleteRecord(s,'incomplete',button.dataset.id,trainerUnlocked));render();return;}
- case 'delete-interrupted':{const found=db.attempts.find(a=>a.id===button.dataset.id);if(!trainerUnlocked&&found?.athleteId!==currentAthlete())return;if(!window.confirm('Удалить прерванную попытку?'))return;operate(s=>M.deleteRecord(s,'attempt',button.dataset.id,trainerUnlocked));render();return;}
- case 'delete-attempt':{
-   const found=M.attemptOf(db,button.dataset.id);
-   if(!found||(!trainerUnlocked&&found.athleteId!==currentAthlete()))return;
-   const last=M.completed(db,M.workoutOf(db,found.workoutId)).length===1;
-   const question=last
-     ?'Удалить последнюю завершённую попытку и тренировку со всеми связанными попытками и комментариями? Рекорды будут пересчитаны.'
-     :'Удалить завершённую попытку? Рекорды будут пересчитаны.';
-   if(!window.confirm(question))return;
-   operate(s=>M.deleteRecord(s,'attempt',button.dataset.id,trainerUnlocked));
-   render();return;
- }
- case 'delete-workout':{
-   const found=M.workoutOf(db,button.dataset.id);
-   if(!found||(!trainerUnlocked&&found.athleteId!==currentAthlete()))return;
-   if(!window.confirm('Удалить тренировку со всеми попытками и комментариями?'))return;
-   operate(s=>M.deleteRecord(s,'workout',button.dataset.id,trainerUnlocked));
-   render();return;
- }
+ case 'delete-incomplete':
+ case 'delete-interrupted':
+ case 'delete-attempt':
+ case 'delete-workout':
  case 'delete-archived':{
-   const found=db.archived.find(a=>a.id===button.dataset.id);
-   if(!found||(!trainerUnlocked&&found.athleteId!==currentAthlete()))return;
-   if(!window.confirm('Удалить архивную тренировку с её попыткой?'))return;
-   operate(s=>M.deleteRecord(s,'archived',button.dataset.id,trainerUnlocked));
+   const aid=managedHistoryAthlete();
+   if(!aid||!historyDeleteEnabled())return;
+   const id=button.dataset.id;
+   const type={'delete-incomplete':'incomplete','delete-interrupted':'attempt','delete-attempt':'attempt',
+     'delete-workout':'workout','delete-archived':'archived'}[name];
+   const collection={incomplete:db.incomplete,attempt:db.attempts,workout:db.workouts,archived:db.archived}[type];
+   const entry=collection.find(item=>item.id===id&&item.athleteId===aid);
+   if(!entry)return;
+   const workout=type==='workout'?entry:type==='attempt'?M.workoutOf(db,entry.workoutId):null;
+   if(workout&&M.currentChild(db)?.workoutIds.includes(workout.id))return;
+   if(workout?.id===db.device.activeWorkoutId&&name!=='delete-interrupted')return;
+   let question={
+     'delete-incomplete':'Удалить неполную попытку?',
+     'delete-interrupted':'Удалить прерванную попытку?',
+     'delete-workout':'Удалить тренировку со всеми попытками и комментариями?',
+     'delete-archived':'Удалить архивную тренировку с её попыткой?'
+   }[name];
+   if(name==='delete-interrupted'&&entry.status!=='interrupted')return;
+   if(name==='delete-attempt'){
+     if(entry.status!=='completed')return;
+     const last=M.completed(db,workout).length===1;
+     if(last&&!trainerUnlocked)return;
+     question=last
+       ?'Удалить последнюю завершённую попытку и тренировку со всеми связанными попытками и комментариями? Рекорды будут пересчитаны.'
+       :'Удалить завершённую попытку? Рекорды будут пересчитаны.';
+   }
+   if(!window.confirm(question))return;
+   operate(s=>M.deleteRecord(s,type,id,trainerUnlocked));
    render();return;
  }
  case 'export-json':{const data=JSON.stringify(exportSnapshot(),null,2);await download('sidesteps_backup_v6.json',data);return;}
@@ -1017,7 +1022,7 @@ app.addEventListener('submit',e=>{
     const row=form.closest('.athlete-row');
     const profile=operate(s=>M.renameAthlete(s,form.dataset.athleteId,form.elements['athlete-name'].value));
     row.querySelector('[data-athlete-name]').textContent=profile.name;
-    const selectors='#trainer-a option,#trainer-b option,#archive-athlete option';
+    const selectors='#trainer-a option,#trainer-b option';
     for(const option of app.querySelectorAll(selectors)){
       if(option.value===profile.id)option.textContent=profile.name;
     }
@@ -1028,7 +1033,13 @@ app.addEventListener('input',e=>{if(screen==='settings'&&settingsDraft&&e.target
 app.addEventListener('change',e=>{
   const {id,value}=e.target;
   try{
-    if(screen==='settings'&&e.target.name==='launch-animation'){
+    if(id==='show-history-delete'){
+      if(renderError||!(settingsHaveProfileName()&&screen==='settings'||trainerUnlocked&&screen==='trainer'))return;
+      const checked=e.target.checked;
+      e.target.checked=historyDeleteEnabled();
+      writeTrainerSettings({...trainerSettings(),[historySettingsKey()]:checked});
+      e.target.checked=checked;
+    }else if(screen==='settings'&&e.target.name==='launch-animation'){
       if(!settingsDraft)beginSettingsDraft();
       if(['glow','pulse','none'].includes(value)){settingsDraft.animation=value;settingsDraft.animationChanged=true;}
     }else if(screen==='settings'&&id==='attempt-count'){

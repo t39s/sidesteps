@@ -176,12 +176,15 @@ def test_personal_data_management(browser):
     p, errs=make_page(browser,{KEY:raw},viewport_width=375,mobile=True)
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
-    assert headings==['Тренировка','Анимация запуска','Название профиля','Обменяться данными',
-                      'Добавить архивный результат','Выборочно удалить данные'],headings
+    assert headings==['Тренировка','Анимация запуска','Название профиля','История','Обменяться данными'],headings
     assert p.get_by_role('button',name='Выгрузить',exact=True).is_visible()
+    switch=p.get_by_role('switch',name='Показывать кнопки удаления в Истории')
+    assert not switch.is_checked()
+    switch.check()
+    p.get_by_role('button',name='Не сохранять',exact=True).click()
     assert p.locator(f'[data-history-workout="{other["id"]}"]').count()==0
     workout=p.locator(f'[data-history-workout="{own["id"]}"]')
-    workout.locator('summary').click()
+    workout.get_by_text('Подробнее',exact=True).click()
     assert workout.get_by_role('button',name='Удалить попытку',exact=True).count()==2
     before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
     p.once('dialog',lambda dialog:dialog.dismiss())
@@ -190,10 +193,9 @@ def test_personal_data_management(browser):
     p.once('dialog',lambda dialog:dialog.accept())
     workout.get_by_role('button',name='Удалить попытку',exact=True).first.click()
     assert len(next(w for w in state(p)['workouts'] if w['id']==own['id'])['attemptIds'])==1
-    assert workout.locator('summary').count()==0
+    workout.get_by_text('Подробнее',exact=True).click()
     assert workout.get_by_role('button',name='Удалить попытку',exact=True).count()==0
-    assert 'Попытка 2' not in workout.inner_text()
-    assert workout.get_by_text('3,000 с',exact=True).is_visible()
+    assert workout.get_by_text('3,000 с',exact=True).first.is_visible()
     p.once('dialog',lambda dialog:dialog.accept())
     workout.get_by_role('button',name='Удалить тренировку',exact=True).click()
     assert all(w['id']!=own['id'] for w in state(p)['workouts'])
@@ -209,7 +211,7 @@ def test_personal_data_management(browser):
     assert [x['bestMs'] for x in sorted(state(p)['archived'],key=lambda a:a['date'],reverse=True)]==[12345,1500]
     newest=state(p)['archived'][-1]['id']
     assert p.locator('[data-history-archive]').first.get_attribute('data-history-archive')==newest
-    assert p.get_by_role('heading',name='Выборочно удалить данные').evaluate('(e)=>getComputedStyle(e).color')=='rgb(250, 143, 150)'
+    p.get_by_role('button',name='Настройки',exact=True).click()
     before_name=state(p)
     p.get_by_label('Имя (указывается в файле выгрузки)',exact=True).fill('Личный профиль')
     p.get_by_role('button',name='Сохранить',exact=True).click()
@@ -225,11 +227,24 @@ def test_personal_data_management(browser):
     q, errs2=make_page(browser,saved,viewport_width=375,mobile=True)
     assert len(state(q)['workouts'])==1
     assert state(q)['athletes'][0]['name']=='Личный профиль'
+    assert q.locator('[data-history-archive] [data-act="delete-archived"]').count()==2
     trainer(q)
-    q.locator(f'[data-act="trainer-history"][data-id="{other["athleteId"]}"]').click()
+    coach_switch=q.get_by_role('switch',name='Показывать кнопки удаления в Истории')
+    assert not coach_switch.is_checked()
+    coach_switch.check()
+    q.locator(f'[data-act="trainer-history"][data-id="{aid}"]').click()
+    q.locator(f'[data-act="history-profile"][data-id="{other["athleteId"]}"]').click()
     history=q.locator(f'[data-history-workout="{other["id"]}"]')
-    history.locator('summary').click()
+    history.get_by_text('Подробнее',exact=True).click()
     assert history.get_by_role('button',name='Удалить попытку',exact=True).count()==1
+    q.locator('#archive-date').fill('2026-11-03')
+    q.locator('#archive-time').fill('15,000')
+    q.get_by_role('button',name='Добавить в архив',exact=True).click()
+    assert state(q)['archived'][-1]['athleteId']==other['athleteId']
+    q.once('dialog',lambda dialog:dialog.accept())
+    q.locator('[data-history-archive] [data-act="delete-archived"]').click()
+    assert len(state(q)['archived'])==2
+    assert all(a['athleteId']==aid for a in state(q)['archived'])
     assert not errors+errs+errs2,errors+errs+errs2
     q.close()
 
@@ -296,7 +311,6 @@ def test_modes_settings_and_statistics(browser):
     assert [w['measurementPlan']['purpose'] for w in before['workouts']]==['test','working']
     baseline=p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')
     assert baseline==before['attempts'][1]['totalMs']
-    p.get_by_role('button',name='Настройки',exact=True).click()
     p.locator('#archive-date').fill('2026-11-01');p.locator('#archive-time').fill('0,1')
     p.get_by_role('button',name='Добавить в архив',exact=True).click()
     assert p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')==baseline
@@ -370,37 +384,33 @@ def test_settings_draft_and_bounded_lists(browser):
         assert history.locator(':scope > .history-item').count()==4
         p.get_by_role('button',name='Настройки',exact=True).click()
         before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
-        manage=p.locator(f'[data-list-container="manage:athlete:{aid}"]')
         interrupted=p.locator(f'[data-list-container="interrupted:athlete:{aid}"]')
-        assert manage.locator(':scope > .history-item').count()==5
-        assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==5
         p.locator('#profile-name').fill('Черновик')
         p.locator('#attempt-count').select_option('1')
         p.locator('#mode-select').select_option('stopwatch')
         p.locator('input[name="launch-animation"][value="none"]').check()
-        assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
-        manage.get_by_role('button',name='Все тренировки (14)',exact=True).click()
-        assert manage.locator(':scope > .history-item').count()==14
+        p.get_by_role('switch').check()
         assert p.locator('#profile-name').input_value()=='Черновик'
+        assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
+        p.get_by_role('button',name='Не сохранять',exact=True).click()
+        assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==5
         interrupted.get_by_role('button',name='Все попытки (7)',exact=True).click()
         assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==7
         p.once('dialog',lambda dialog:dialog.accept())
-        manage.locator('[data-history-archive]').first.get_by_role('button',name='Удалить тренировку',exact=True).click()
-        assert manage.locator(':scope > .history-item').count()==13
-        p.get_by_role('button',name='Не сохранять',exact=True).click()
+        archive.locator('[data-history-archive]').first.get_by_role('button',name='Удалить тренировку',exact=True).click()
         assert state(p)['athletes'][0]['name']=='Спортсмен'
         assert len(state(p)['archived'])==6
         assert state(p)['device']['soloPlannedAttempts']==2
         assert archive.locator(':scope > .history-item').count()==6
+        date=p.locator('#archive-date').bounding_box()
+        time=p.locator('#archive-time').bounding_box()
+        assert abs(date['x']-time['x'])<1 and abs(date['width']-time['width'])<1
+        assert date['y']>=p.locator('label[for="archive-date"] span').bounding_box()['y']+p.locator('label[for="archive-date"] span').bounding_box()['height']
         p.get_by_role('button',name='Настройки',exact=True).click()
         actions=p.locator('.settings-actions')
         save,discard=[button.bounding_box() for button in actions.get_by_role('button').all()]
         assert abs(save['y']-discard['y'])<1
         assert save['y']<p.locator('#profile-name').bounding_box()['y']
-        date=p.locator('#archive-date').bounding_box()
-        time=p.locator('#archive-time').bounding_box()
-        assert abs(date['x']-time['x'])<1 and abs(date['width']-time['width'])<1
-        assert date['y']>=p.locator('label[for="archive-date"] span').bounding_box()['y']+p.locator('label[for="archive-date"] span').bounding_box()['height']
         p.locator('#profile-name').fill('Сохранено')
         p.get_by_role('button',name='Сохранить',exact=True).click()
         p.locator('#profile-name').fill('Несохранённое имя')
