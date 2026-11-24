@@ -525,7 +525,7 @@ function archiveForm(){
   return card('<h2>Добавить архивный результат</h2>'+
     '<p class="note">Ручной ввод. '+(includeArchiveStats()?'Учитывается в рекорде, среднем и прогрессе.':'Не учитывается в рекорде, среднем и прогрессе.')+'</p><label class="archive-field" for="archive-date"><span>Дата</span><input type="date" id="archive-date"></label>'+
     '<label class="archive-field" for="archive-time"><span>Время, секунды</span><input type="text" id="archive-time" inputmode="decimal" placeholder="Например 23,567"></label>'+
-    '<div class="buttons">'+b('Добавить в архив','add-archive','primary')+'</div>');
+    '<div class="buttons">'+b('Добавить в архив','add-archive',db.device.lastInterface==='trainer'?'primary wide':'primary')+'</div>');
 }
 function trainerAthleteRow(profile){
   const id=esc(profile.id),name=esc(profile.name),attrs=`data-id="${id}"`;

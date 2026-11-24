@@ -444,6 +444,8 @@ def test_trainer_backup_geometry(browser):
         assert reset['y']>=export['y']+export['height']
         assert abs(reset['width']-backups.bounding_box()['width'])<1
         add=p.get_by_role('button',name='Добавить в архив',exact=True)
+        assert add.count()==0
+        p.locator('[data-act="trainer-history"]').first.click()
         assert abs(add.bounding_box()['width']-add.locator('..').bounding_box()['width'])<1
         assert p.evaluate('document.documentElement.scrollWidth<=innerWidth')
         assert not errors,errors
