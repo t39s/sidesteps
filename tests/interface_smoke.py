@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('link',name='Интерфейс тренера',exact=True)
-        assert version.inner_text()=='v. 0.3.5-rc.2'
+        assert version.inner_text()=='v. 0.3.5-rc.3'
         assert login.count()==0
         page.get_by_role('tab',name='Новая тренировка').click()
         page.get_by_role('button',name='Настройки',exact=True).click()
@@ -32,17 +32,21 @@ with sync_playwright() as playwright:
         page.locator('[data-act=end-training]').click()
         page.get_by_role('tab',name='История',exact=True).wait_for()
         page.get_by_role('button',name='Настройки',exact=True).click()
-        assert page.get_by_role('heading',name='Настройки истории',exact=True).is_visible()
-        assert page.locator('main > .panel > h2').all_text_contents()==['История']
+        assert page.get_by_role('heading',name='Настройки',exact=True).is_visible()
+        assert page.locator('main > .panel > h2').all_text_contents()==['История','Название профиля']
         assert page.locator('.settings-icon,.close-training').count()==0
-        page.get_by_role('button',name='Не сохранять',exact=True).click()
-        page.locator('.history-more > summary').click()
-        assert login.is_visible()
-        assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
-        page.get_by_role('link',name='Обменяться данными',exact=True).click()
         assert_form_fields(page,['#profile-name'])
         page.locator('#profile-name').fill('Длинное имя спортивного профиля для проверки')
         assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
+        page.get_by_role('button',name='Не сохранять',exact=True).click()
+        more=page.locator('.history-more > summary')
+        more.click()
+        assert login.is_visible()
+        assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
+        page.get_by_role('link',name='Обменяться данными',exact=True).click()
+        assert page.locator('#profile-name').count()==0
+        assert page.get_by_role('button',name='Выгрузить',exact=True).is_visible()
+        assert page.get_by_role('button',name='Загрузить',exact=True).is_visible()
         page.get_by_role('button',name='Назад',exact=True).click()
         page.locator('.history-more > summary').click()
         login.click()
@@ -71,7 +75,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='v. 0.3.5-rc.2'
+        assert footer.locator('.app-version').inner_text()=='v. 0.3.5-rc.3'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

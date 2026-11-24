@@ -1,6 +1,6 @@
-sidesteps v0.3.5-rc.2
+sidesteps v0.3.5-rc.3
 Candidate date: 2026-11-24
 Status: PREVIEW
 Branch: develop
 Stable baseline: v0.3.4, 3de9a1d63975aec4a9d00ca54714ea328bf76c3e
-Changes: separate athlete History and workout settings, add History actions menu, and lock plan settings after the first attempt starts.
+Changes: move profile naming into athlete History settings and make History footer actions full-width.

@@ -83,7 +83,11 @@ test('personal profile rename preserves identity and history in export and reloa
   s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
   const p=await page({[M.KEY]:JSON.stringify(s)});
   await p.api.handleAction('data-exchange');
-  assert.match(p.html(),/Обменяться данными[\s\S]*profile-name[\s\S]*Выгрузить/);
+  assert.match(p.html(),/Обменяться данными[\s\S]*Выгрузить/);
+  assert.doesNotMatch(p.html(),/profile-name/);
+  await p.api.handleAction('data-exchange-back');
+  await p.api.handleAction('settings');
+  assert.match(p.html(),/Название профиля[\s\S]*id="profile-name"/);
   p.nodes['profile-name']={value:'  Моё имя  '};
   await p.api.handleAction('save-profile-name',{dataset:{id:s.athletes[1].id}});
   const out=p.api.exportSnapshot();
@@ -98,7 +102,7 @@ test('personal profile rename preserves identity and history in export and reloa
 test('personal profile rename rejects invalid input and failed writes atomically',async()=>{
   for(const value of ['', ' '.repeat(2), 'a'.repeat(51), 'Новое имя']){
     const p=await page();
-    await p.api.handleAction('data-exchange');
+    await p.api.handleAction('settings');
     const before=p.data.get(M.KEY);
     p.nodes['profile-name']={value};
     if(value==='Новое имя')p.failWrite();
@@ -185,8 +189,8 @@ function longListsState(){
 test('history visibility commits only on save and never changes workout settings',async()=>{
   const p=await page();const before=p.data.get(M.KEY);
   await p.api.handleAction('settings');
-  assert.match(p.html(),/Настройки истории/);
-  assert.doesNotMatch(p.html(),/attempt-count|mode-select|launch-animation|profile-name|end-training|settings-return/);
+  assert.match(p.html(),/<h1 class="settings-title">Настройки<\/h1>/);
+  assert.doesNotMatch(p.html(),/attempt-count|mode-select|launch-animation|end-training|settings-return/);
   p.appEvents.change({target:{id:'show-history-delete',checked:true}});
   await p.api.handleAction('settings-back');
   assert.notEqual(p.api.settings().showAthleteHistoryDelete,true);
@@ -229,7 +233,7 @@ test('archive, history and interrupted lists expand independently and retain sta
   assert.equal(count(p.api.archiveHistory(aid),/class="history-item"/g),5);
 });
 test('export uses the last saved name while the name field is being edited',async()=>{
-  const p=await page();await p.api.handleAction('data-exchange');
+  const p=await page();await p.api.handleAction('settings');
   p.nodes['profile-name']={value:'Сохранено'};
   await p.api.handleAction('save-profile-name');
   p.nodes['profile-name'].value='Черновик';

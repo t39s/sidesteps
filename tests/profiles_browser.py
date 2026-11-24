@@ -415,10 +415,13 @@ def test_settings_draft_and_bounded_lists(browser):
         assert date['y']>=p.locator('label[for="archive-date"] span').bounding_box()['y']+p.locator('label[for="archive-date"] span').bounding_box()['height']
         p.locator('.history-more > summary').click()
         p.get_by_role('link',name='Обменяться данными',exact=True).click()
+        assert p.locator('#profile-name').count()==0
+        p.get_by_role('button',name='Назад',exact=True).click()
+        p.get_by_role('button',name='Настройки',exact=True).click()
         p.locator('#profile-name').fill('Сохранено')
         p.get_by_role('button',name='Сохранить',exact=True).click()
         p.locator('#profile-name').fill('Несохранённое имя')
-        p.get_by_role('button',name='Назад',exact=True).click()
+        p.get_by_role('button',name='Не сохранять',exact=True).click()
         p.get_by_role('tab',name='Новая тренировка',exact=True).click()
         p.get_by_role('button',name='Настройки',exact=True).click()
         p.locator('#attempt-count').select_option('1')

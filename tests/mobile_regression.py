@@ -148,15 +148,19 @@ def test_history_chart_portrait(browser):
         assert footer.get_by_role('link',name='Интерфейс тренера').count()==0
         q.locator('.history-more > summary').click()
         login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='v. 0.3.5-rc.2'
+        assert version.inner_text()=='v. 0.3.5-rc.3'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert login.bounding_box()['y']+login.bounding_box()['height']<=version.bounding_box()['y']
         assert login.get_attribute('title')=='Для Тренера'
-        assert login.evaluate("(e)=>getComputedStyle(e).textDecorationLine")=='underline'
-        font = "(e)=>{const s=getComputedStyle(e);return [s.fontFamily,s.fontSize,s.fontWeight,s.fontStyle]}"
-        assert login.evaluate(font)==version.evaluate(font)
+        previous_bottom=footer.bounding_box()['y']
+        for action in (footer.locator('summary'),footer.get_by_role('link',name='Обменяться данными'),login):
+            box=action.bounding_box()
+            assert abs(box['width']-footer.bounding_box()['width'])<1
+            assert box['height']>=48 and box['y']>=previous_bottom
+            previous_bottom=box['y']+box['height']
+        assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth')
         assert q.locator('.app-head .brand').inner_text()=='Приставные шаги\nна время'
         login.focus()
         login.press('Enter')
