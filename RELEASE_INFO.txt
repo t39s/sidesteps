@@ -1,6 +1,7 @@
-sidesteps v0.3.5-rc.5
-Candidate date: 2026-11-25
-Status: PREVIEW
-Branch: develop
-Stable baseline: v0.3.4, 3de9a1d63975aec4a9d00ca54714ea328bf76c3e
-Changes: athlete History actions, backup labels, settings buttons and application version label.
+sidesteps v0.3.5
+Release date: 2026-11-25
+Status: STABLE — accepted by owner 2026-11-25
+Branch: main
+Stable baseline: v0.3.4, main 3de9a1d63975aec4a9d00ca54714ea328bf76c3e
+Accepted candidate: v0.3.5-rc.5, 9efe3d5c16dfe43632a6ebf45d11621998b4b4eb
+Changes: History record management, athlete settings and backup navigation.
