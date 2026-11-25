@@ -145,17 +145,14 @@ def test_history_chart_portrait(browser):
         assert q.evaluate('document.documentElement.scrollWidth<=window.innerWidth'),(width,q.evaluate('document.documentElement.scrollWidth'))
         footer=q.locator('footer')
         version=footer.locator('.app-version')
-        assert footer.get_by_role('link',name='Интерфейс тренера').count()==0
-        q.locator('.history-more > summary').click()
-        login=footer.get_by_role('link',name='Интерфейс тренера')
-        assert version.inner_text()=='v. 0.3.5-rc.4'
+        login=footer.get_by_role('button',name='Вход в интерфейс тренера')
+        assert version.inner_text()=='Версия 0.3.5-rc.5'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert login.bounding_box()['y']+login.bounding_box()['height']<=version.bounding_box()['y']
-        assert login.get_attribute('title')=='Для Тренера'
         previous_bottom=footer.bounding_box()['y']
-        for action in (footer.locator('summary'),footer.get_by_role('link',name='Обменяться данными'),login):
+        for action in (footer.get_by_role('button',name='Резервное копирование'),login):
             box=action.bounding_box()
             assert abs(box['width']-footer.bounding_box()['width'])<1
             assert box['height']>=48 and box['y']>=previous_bottom

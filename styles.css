@@ -149,20 +149,6 @@ input:not([type=checkbox], [type=radio], [type=file]), select, textarea {
   font-size: max(16px, 1em);
 }
 
-.history-more{align-self:stretch;margin:0 0 .25rem;white-space:normal}
-.history-more-links{display:grid;gap:.5rem;margin-top:.5rem}
-.history-more>summary,.history-more-links>a{
-  border:1px solid var(--line);
-  border-radius:13px;
-  background:var(--card2);
-  color:var(--text);
-  padding:14px 16px;
-  min-height:48px;
-  font-size:1rem;
-  font-weight:650;
-  touch-action:manipulation;
-}
-.history-more>summary{list-style-position:inside}
-.history-more-links>a{text-decoration:none}
-.history-more>summary:focus-visible,.history-more-links>a:focus-visible{outline:3px solid var(--cyan)}
+.history-actions{align-self:stretch;margin:0 0 .25rem;font-size:1rem;white-space:normal}
+.tall-action{line-height:1.25;min-height:calc(2.5em + 30px)}
 .archive-add{margin-bottom:.75rem}

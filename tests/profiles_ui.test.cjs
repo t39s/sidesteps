@@ -33,7 +33,7 @@ test('base selection migrates v5 session after a previously deleted workout, wit
 test('personal history scopes manual archive input and data exchange has its own screen',async()=>{
   const p=await page();
   await p.api.handleAction('settings');
-  assert.doesNotMatch(p.html(),/Обменяться данными|Выгрузить/);
+  assert.doesNotMatch(p.html(),/Резервное копирование|Сохранить копию/);
   assert.doesNotMatch(p.html(),/Добавить архивный результат/);
   await p.api.handleAction('settings-back');
   assert.match(p.html(),/Архивные тренировки[\s\S]*Добавить результат/);
@@ -43,7 +43,7 @@ test('personal history scopes manual archive input and data exchange has its own
   assert.equal(p.api.state().archived[0].athleteId,p.api.state().baseProfileId);
   assert.equal(p.api.state().archived[0].bestMs,12345);
   assert.equal(p.api.authorized(),false);
-  await p.api.handleAction('data-exchange');assert.match(p.html(),/Обменяться данными[\s\S]*Выгрузить/);
+  await p.api.handleAction('data-exchange');assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
 });
 test('personal deletion cancellation and write failure leave exact bytes unchanged',async()=>{
   const s=M.addArchived(M.blank(),'athlete-default','2026-11-01',2000).state;
@@ -83,7 +83,7 @@ test('personal profile rename preserves identity and history in export and reloa
   s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
   const p=await page({[M.KEY]:JSON.stringify(s)});
   await p.api.handleAction('data-exchange');
-  assert.match(p.html(),/Обменяться данными[\s\S]*Выгрузить/);
+  assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
   assert.doesNotMatch(p.html(),/profile-name/);
   await p.api.handleAction('data-exchange-back');
   await p.api.handleAction('settings');

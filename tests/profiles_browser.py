@@ -180,7 +180,7 @@ def test_personal_data_management(browser):
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
     assert headings==['Название профиля','История'],headings
-    assert p.get_by_role('button',name='Выгрузить',exact=True).count()==0
+    assert p.get_by_role('button',name='Сохранить копию',exact=True).count()==0
     switch=p.get_by_role('switch',name='Показывать кнопки удаления в Истории')
     assert not switch.is_checked()
     switch.check()
@@ -261,8 +261,7 @@ def test_personal_profile_selection(browser):
     }""")
     seed.close()
     p,errs=make_page(browser,viewport_width=375,mobile=True)
-    p.locator('.history-more > summary').click()
-    p.get_by_role('link',name='Обменяться данными',exact=True).click()
+    p.get_by_role('button',name='Резервное копирование',exact=True).click()
     before=p.evaluate('(key)=>localStorage.getItem(key)',KEY)
     p.locator('#file-import').set_input_files({
         'name':'profiles.json','mimeType':'application/json','buffer':raw.encode()})
@@ -275,11 +274,11 @@ def test_personal_profile_selection(browser):
     selected=json.loads(raw)['athletes'][1]['id']
     p.locator('#base-choice').select_option(selected)
     p.get_by_role('button',name='Загрузить профиль',exact=True).click()
-    p.get_by_role('heading',name='Обменяться данными',exact=True).wait_for()
+    p.get_by_role('heading',name='Резервное копирование',exact=True).wait_for()
     assert state(p)['baseProfileId']==selected
     assert len(state(p)['athletes'])==1
     assert len(state(p)['archived'])==1
-    assert p.get_by_role('link',name='Интерфейс тренера',exact=True).count()==0
+    assert p.get_by_role('button',name='Вход в интерфейс тренера',exact=True).count()==0
     assert not state(p)['device']['trainerActivated']
     assert not errors+errs,errors+errs
     p.close()
@@ -394,7 +393,7 @@ def test_settings_draft_and_bounded_lists(browser):
         p.locator('#profile-name').fill('Черновик')
         p.get_by_role('switch').check()
         assert p.evaluate('(key)=>localStorage.getItem(key)',KEY)==before
-        p.get_by_role('button',name='Не сохранить',exact=True).click()
+        p.get_by_role('button',name='Отмена',exact=True).click()
         assert state(p)['athletes'][0]['name']=='Спортсмен'
         assert interrupted.get_by_role('button',name='Удалить попытку',exact=True).count()==0
         p.get_by_role('button',name='Настройки',exact=True).click()
@@ -417,15 +416,14 @@ def test_settings_draft_and_bounded_lists(browser):
         time=p.locator('#archive-time').bounding_box()
         assert abs(date['x']-time['x'])<1 and abs(date['width']-time['width'])<1
         assert date['y']>=p.locator('label[for="archive-date"] span').bounding_box()['y']+p.locator('label[for="archive-date"] span').bounding_box()['height']
-        p.locator('.history-more > summary').click()
-        p.get_by_role('link',name='Обменяться данными',exact=True).click()
+        p.get_by_role('button',name='Резервное копирование',exact=True).click()
         assert p.locator('#profile-name').count()==0
         p.get_by_role('button',name='Назад',exact=True).click()
         p.get_by_role('tab',name='Новая тренировка',exact=True).click()
         p.get_by_role('button',name='Настройки',exact=True).click()
         p.locator('#attempt-count').select_option('1')
         p.locator('#mode-select').select_option('stopwatch')
-        p.get_by_role('button',name='Сохранить настройки',exact=True).click()
+        p.get_by_role('button',name='Сохранить',exact=True).click()
         assert state(p)['athletes'][0]['name']=='Сохранено'
         assert state(p)['device']['soloPlannedAttempts']==1
         assert state(p)['device']['soloMeasurementMode']=='stopwatch'

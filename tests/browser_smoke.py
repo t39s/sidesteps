@@ -43,10 +43,10 @@ def tap(page,advance=True):
     page.wait_for_timeout(90)
 
 def open_trainer_login(page):
-    link=page.get_by_role('link',name='Интерфейс тренера',exact=True)
-    if not link.count():
-        page.locator('.history-more > summary').click()
-    link.click()
+    entry=page.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
+    if not entry.count():
+        entry=page.get_by_role('link',name='Интерфейс тренера',exact=True)
+    entry.click()
 
 def trainer(page):
     open_trainer_login(page)
@@ -62,7 +62,7 @@ def new_exercise(page, attempts=None, mode=None):
             page.locator('#attempt-count').select_option(str(attempts))
         if mode is not None:
             page.locator('#mode-select').select_option(mode)
-        page.get_by_role('button',name='Сохранить настройки',exact=True).click()
+        page.get_by_role('button',name='Сохранить',exact=True).click()
 
 def test_adult(browser):
     page,errors=make_page(browser,pin=False)
@@ -80,7 +80,7 @@ def test_adult(browser):
     assert mode.locator('option:checked').inner_text()=='1 отсечка'
     page.locator('#attempt-count').select_option('1')
     mode.select_option('stopwatch')
-    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    page.get_by_role('button',name='Сохранить',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.locator('.play-glyph').is_visible()
 
@@ -95,7 +95,7 @@ def test_adult(browser):
     assert page.locator('#attempt-count').input_value()=='2'
     page.locator('#attempt-count').select_option('1')
     page.locator('#mode-select').select_option('stopwatch')
-    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    page.get_by_role('button',name='Сохранить',exact=True).click()
     page.get_by_role('heading',name='Попытка 1 из 1').wait_for()
     assert page.locator('.play-glyph').is_visible()
     tap(page);tap(page)
@@ -212,13 +212,13 @@ def test_rest_and_early_start(browser):
     page.get_by_role('heading',name='Отдых',exact=True).wait_for()
     assert page.get_by_role('button',name='Начать раньше').bounding_box()['width']==result_button_width
     assert page.get_by_text('Спортсмен',exact=True).count()==0
-    assert page.locator('footer').get_by_role('link',name='Интерфейс тренера').count()==0
+    assert page.locator('footer').get_by_role('button',name='Вход в интерфейс тренера').count()==0
     page.get_by_role('button',name='Настройки',exact=True).click()
     assert page.get_by_role('heading',name='Настройки тренировки',exact=True).is_visible()
     assert page.get_by_text('Режим и число попыток можно изменить перед следующей тренировкой.').is_visible()
     assert page.locator('#attempt-count,#mode-select,.settings-icon,.close-training').count()==0
     page.get_by_label('Без анимации',exact=True).check()
-    page.get_by_role('button',name='Сохранить настройки',exact=True).click()
+    page.get_by_role('button',name='Сохранить',exact=True).click()
     assert page.get_by_role('heading',name='Отдых',exact=True).is_visible()
     page.get_by_role('button',name='Начать раньше').click()
     page.get_by_text('Попытка 2 из 2').wait_for()

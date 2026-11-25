@@ -530,8 +530,8 @@ function animationSettings(){
     [['glow','Сияние'],['pulse','Пульсация'],['none','Без анимации']].map(([value,label])=>
       `<label class="animation-option"><span class="animation-sample" aria-hidden="true"><span class="counter-ready launch-${value}"><span class="play-glyph"></span></span></span><span>${label}</span><input type="radio" name="launch-animation" value="${value}" ${value===selected?'checked':''}></label>`).join('')+'</div>');
 }
-function settingsActions(history){
-  return `<div class="buttons settings-actions">${b(history?'Сохранить':'Сохранить настройки','settings-save','primary')}${b(history?'Не сохранить':'Не сохранять','settings-back','nav-return')}</div>`;
+function settingsActions(){
+  return `<div class="buttons settings-actions">${b('Сохранить','settings-save','primary tall-action')}${b('Отмена','settings-back','nav-return tall-action')}</div>`;
 }
 function appSettings(){
   if(!settingsDraft)beginSettingsDraft();
@@ -544,18 +544,18 @@ function appSettings(){
     '<label>Имя (указывается в файле выгрузки)<input id="profile-name" maxlength="50" value="'+esc(profileName)+'"></label>');
   const content=renderError?card(muted('Настройки недоступны, пока приложение не откроется.')):
     history?profileSettings+historyDeletionSettings(historyDelete):plan+animationSettings();
-  return header()+`<h1 class="settings-title">${title}</h1>`+content+settingsActions(history);
+  return header()+`<h1 class="settings-title">${title}</h1>`+content+settingsActions();
 }
-function athleteHistoryMenu(){
-  return `<details class="history-more"><summary>Ещё</summary><div class="history-more-links">
-    <a href="#data-exchange" data-act="data-exchange">Обменяться данными</a>
-    <a href="#admin-login" data-act="pin" title="Для Тренера">Интерфейс тренера</a>
-    </div></details>`;
+function athleteHistoryActions(){
+  return `<div class="buttons history-actions">
+    ${b('Резервное копирование','data-exchange','primary wide tall-action')}
+    ${b('Вход в интерфейс тренера','pin','wide')}
+  </div>`;
 }
 function dataExchangeScreen(){
-  return header()+card('<h1>Обменяться данными</h1>'+
-    '<div class="buttons">'+b('Выгрузить','export-json','wide')+b('Загрузить','import-json','wide')+
-    '</div><p class="note center">Данные хранятся на&nbsp;устройстве.</p><input type="file" id="file-import" accept=".json,application/json" hidden>')+
+  return header()+card('<h1>Резервное копирование</h1>'+
+    '<div class="buttons">'+b('Сохранить копию','export-json','wide')+b('Восстановить данные','import-json','wide')+
+    '</div><p class="note center">Данные хранятся на&nbsp;устройстве.</p><input id="file-import" type="file" accept=".json,application/json" hidden>')+
     b('Назад','data-exchange-back','wide nav-return');
 }
 function archiveFields(){
@@ -606,7 +606,7 @@ function trainerHome(){const c=M.currentChild(db),options=db.athletes.map(a=>`<o
 }
 function baseChoice(source,action,personal=false){return card('<h1>'+(personal?'Выберите профиль для загрузки':'Выберите базовый профиль')+'</h1><label>Профиль<select id="base-choice">'+source.athletes.map(a=>`<option value="${esc(a.id)}">${esc(a.name)} · ${source.workouts.filter(w=>w.athleteId===a.id).length} тренировок · ${source.archived.filter(w=>w.athleteId===a.id).length} архивных результатов</option>`).join('')+'</select></label><p>'+(personal?'Будет загружен только выбранный профиль.':'Этот профиль будет доступен без PIN.')+'</p>'+b(personal?'Загрузить профиль':'Назначить базовым',action,'primary wide'));}
 function pinScreen(){return header('','',false,'',false)+card(`<h2>Вход в интерфейс тренера</h2>${!config?.trainerAccess?`<div class="error">PIN пока не сконфигурирован. Разработчик должен записать проверочный хеш PIN, выбранного Тренером, в config.json.</div>`:`<label>PIN-код<input type="password" id="pin-input" inputmode="numeric" autocomplete="off" maxlength="32" placeholder="PIN"></label><div class="buttons">${b('Войти','pin-submit','primary wide')}</div>`}`)+b('Назад','pin-back','wide');}
-function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='data-exchange')html=dataExchangeScreen();else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAthleteExit=trainerUnlocked&&!renderError&&['trainer','history','child-final'].includes(screen);const showHistoryMenu=!renderError&&personalHistoryScreen();app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">v. 0.3.5-rc.4</span>${showAthleteExit?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showHistoryMenu?athleteHistoryMenu():''}</footer></main>`;
+function render(){if(!db)return;if(pendingMigration){app.innerHTML=`<main class="shell">${screen==='migration-select'&&trainerUnlocked?baseChoice(pendingMigration.source,'migration-confirm'):card('<h1>Выберите базовый профиль</h1><p>Исходная история сохранена. Для выбора базового профиля войдите как Тренер.</p>')+pinScreen()}</main>`;return;}if(pendingImport){app.innerHTML=`<main class="shell">${baseChoice(pendingImport.raw,'import-confirm',pendingImport.personal)}${b('Отмена','import-cancel','wide')}</main>`;return;}document.body?.classList.toggle('trainer-theme',['child','trainer'].includes(db.device.lastInterface));const previousPlot=app.querySelector('.chart-scrollable[data-positioned]');const plotOffset=previousPlot?.scrollLeft;let html='';if(screen==='settings')html=appSettings();else if(renderError)html=header()+card(`<div class="error">${esc(renderError)}</div>${renderError.includes('Interval Lab')||renderError.includes('перенос')?'<div class="buttons"><a class="primary wide" href="https://t39s.github.io/dev-sandbox/interval-lab/">Открыть Interval Lab для переноса</a></div>':`<div class="buttons">${b('Экспортировать текущие данные','export-json')}</div>`}`);else if(screen==='data-exchange')html=dataExchangeScreen();else if(screen==='pin')html=pinScreen();else if(screen==='trainer')html=trainerUnlocked?trainerHome():pinScreen();else if(screen==='athlete')html=adultHome();else if(screen==='athlete-ready')html=soloReady();else if(screen==='child-ready')html=childReady();else if(screen==='child-final')html=childFinal();else if(screen==='result')html=resultScreen();else if(screen==='rest'){const c=M.currentChild(db),turn=M.nextTurn(db);const w=c?M.workoutOf(db,turn?.workoutId):M.workoutOf(db,db.device.activeWorkoutId);html=restScreen(!!c,w);}else if(screen==='final')html=finalAdult();else if(screen==='history')html=historyScreen();else html=adultHome();const showAthleteExit=trainerUnlocked&&!renderError&&['trainer','history','child-final'].includes(screen);const showHistoryActions=!renderError&&personalHistoryScreen();app.innerHTML=`<main class="shell">${html}<footer class="nav-spacer app-footer athlete-footer"><span class="app-version">Версия 0.3.5-rc.5</span>${showAthleteExit?'<a href="#exit" data-act="switch-athlete">Интерфейс спортсмена</a>':''}${showHistoryActions?athleteHistoryActions():''}</footer></main>`;
   const plot=app.querySelector('.chart-scrollable');
   if(plot?.clientWidth&&plotOffset!==undefined){
     plot.scrollLeft=plotOffset;
