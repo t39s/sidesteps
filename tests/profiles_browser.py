@@ -180,7 +180,7 @@ def test_personal_data_management(browser):
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
     assert headings==['Название профиля','История'],headings
-    assert p.get_by_role('button',name='Сохранить копию',exact=True).count()==0
+    assert p.locator('[data-act=export-json]').count()==0
     switch=p.get_by_role('switch',name='Показывать кнопки удаления в Истории')
     assert not switch.is_checked()
     switch.check()
@@ -274,7 +274,7 @@ def test_personal_profile_selection(browser):
     selected=json.loads(raw)['athletes'][1]['id']
     p.locator('#base-choice').select_option(selected)
     p.get_by_role('button',name='Загрузить профиль',exact=True).click()
-    p.get_by_role('heading',name='Резервное копирование',exact=True).wait_for()
+    p.get_by_role('heading',name='Резервное копирование всех данных',exact=True).wait_for()
     assert state(p)['baseProfileId']==selected
     assert len(state(p)['athletes'])==1
     assert len(state(p)['archived'])==1

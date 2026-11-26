@@ -4,7 +4,7 @@ async function page(initial={},options={}){
  const data=new Map(Object.entries(initial)),nodes={},events={},appEvents={},messages=[];let failedKey;
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
  const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failedKey===true||failedKey===k)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
- const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
+ const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirmations?.shift()??options.confirm!==false,prompt:()=>null};
  const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,statsPoints,recordAsOf,workoutDetails,archiveHistory,historyItems,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
  window:browser,document:{getElementById:k=>k==='app'?app:k==='toast'?{style:{},set textContent(v){messages.push(v);}}:nodes[k],addEventListener(){}},
@@ -43,8 +43,29 @@ test('personal history scopes manual archive input and data exchange has its own
   assert.equal(p.api.state().archived[0].athleteId,p.api.state().baseProfileId);
   assert.equal(p.api.state().archived[0].bestMs,12345);
   assert.equal(p.api.authorized(),false);
-  await p.api.handleAction('data-exchange');assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
+  await p.api.handleAction('data-exchange');assert.match(p.html(),/Резервное копирование всех данных[\s\S]*Сохранить/);
 });
+test('personal backup deletes only the base history and permits restoring a copy',async()=>{
+  let s=M.addAthlete(M.blank(),'Другой спортсмен').state;
+  const aid=s.baseProfileId,other=s.athletes[1].id;
+  s=M.renameAthlete(s,aid,'Мой профиль').state;
+  s=M.addArchived(s,aid,'2026-11-01',2000).state;
+  s=M.addArchived(s,other,'2026-11-02',3100).state;
+  const confirmations=[true,false,true,true],p=await page({[M.KEY]:JSON.stringify(s)},{confirmations});
+  await p.api.handleAction('data-exchange');
+  const backup=p.api.exportSnapshot(),before=p.data.get(M.KEY);
+  await p.api.handleAction('reset-personal');
+  assert.equal(p.data.get(M.KEY),before);
+  await p.api.handleAction('reset-personal');
+  assert.equal(p.api.screen(),'athlete');
+  assert.deepEqual(p.api.state().athletes,s.athletes);
+  assert.deepEqual(p.api.state().archived,s.archived.filter(a=>a.athleteId===other));
+  assert.deepEqual(confirmations,[]);
+  await p.api.handleAction('data-exchange');
+  await p.api.importFile({text:async()=>JSON.stringify(backup)});
+  assert.deepEqual(p.api.state().archived.map(a=>a.id).sort(),s.archived.map(a=>a.id).sort());
+});
+
 test('personal deletion cancellation and write failure leave exact bytes unchanged',async()=>{
   const s=M.addArchived(M.blank(),'athlete-default','2026-11-01',2000).state;
   for(const cancel of [true,false]){
@@ -83,7 +104,7 @@ test('personal profile rename preserves identity and history in export and reloa
   s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
   const p=await page({[M.KEY]:JSON.stringify(s)});
   await p.api.handleAction('data-exchange');
-  assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
+  assert.match(p.html(),/Резервное копирование всех данных[\s\S]*Сохранить/);
   assert.doesNotMatch(p.html(),/profile-name/);
   await p.api.handleAction('data-exchange-back');
   await p.api.handleAction('settings');

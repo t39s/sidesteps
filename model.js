@@ -302,11 +302,7 @@
       return true;
     });
   }
-  function deleteProfileInPlace(n,aid,replacementId){
-    assert(n.athletes.length>1,'Нельзя удалить последний профиль');assert(n.athletes.some(a=>a.id===aid),'Нет профиля');
-    assert(workoutOf(n,n.device.activeWorkoutId)?.athleteId!==aid&& !currentChild(n)?.athleteIds.includes(aid),'Сначала завершите тренировку или занятие');
-    if(n.baseProfileId===aid){assert(replacementId!==aid&&n.athletes.some(a=>a.id===replacementId),'Выберите замену базового профиля');n.baseProfileId=replacementId;}
-    n.athletes=n.athletes.filter(a=>a.id!==aid);
+  function removeProfileHistory(n,aid){
     for(const k of ['workouts','attempts','archived','incomplete'])n[k]=n[k].filter(x=>x.athleteId!==aid);
     // Retain other participants' results and project the historical session onto them.
     n.childSessions=n.childSessions.filter(c=>{const removed=c.sequence.slice(0,c.nextIndex).filter(t=>t.athleteId===aid).length;
@@ -314,6 +310,20 @@
       if(c.unavailableWorkoutIds){c.unavailableWorkoutIds=c.unavailableWorkoutIds.filter(id=>c.workoutIds.includes(id));if(!c.unavailableWorkoutIds.length)delete c.unavailableWorkoutIds;}
       c.athleteIds=c.athleteIds.filter(id=>id!==aid);
       c.sequence=c.sequence.filter(t=>t.athleteId!==aid);c.nextIndex-=removed;return c.athleteIds.length;});
+  }
+  function clearPersonalHistory(s){
+    return mutation(s,n=>{
+      assert(!n.device.activeWorkoutId&&!currentChild(n),'Сначала завершите тренировку или занятие');
+      removeProfileHistory(n,n.baseProfileId);
+      return true;
+    });
+  }
+  function deleteProfileInPlace(n,aid,replacementId){
+    assert(n.athletes.length>1,'Нельзя удалить последний профиль');assert(n.athletes.some(a=>a.id===aid),'Нет профиля');
+    assert(workoutOf(n,n.device.activeWorkoutId)?.athleteId!==aid&& !currentChild(n)?.athleteIds.includes(aid),'Сначала завершите тренировку или занятие');
+    if(n.baseProfileId===aid){assert(replacementId!==aid&&n.athletes.some(a=>a.id===replacementId),'Выберите замену базового профиля');n.baseProfileId=replacementId;}
+    n.athletes=n.athletes.filter(a=>a.id!==aid);
+    removeProfileHistory(n,aid);
     n.device.childParticipants=n.device.childParticipants.filter(id=>id!==aid);
     for(const k of ['selectedAthleteId','trainerAthleteId','viewAthleteId'])if(n.device[k]===aid)n.device[k]=n.baseProfileId;
     return true;
@@ -385,12 +395,16 @@
     const incoming=selectProfile(normalizeImport(raw,aid),aid);
     if(isPlaceholder(s))return evaluateImport(s,incoming,false);
     assert(aid===s.baseProfileId,'Доступен только базовый профиль');
-    assert(equivalent(profileProjection(selectProfile(s,aid),aid),profileProjection(incoming,aid)),
-      'Конфликт профиля или истории: '+incoming.athletes[0].name);
+    const current=profileProjection(selectProfile(s,aid),aid);
+    const restored=profileProjection(incoming,aid);
+    if(fields.every(field=>!current[field].length)&&equivalent(current.profile,restored.profile)){
+      return merge(s,incoming,{emptyProfile:aid});
+    }
+    assert(equivalent(current,restored),'Конфликт профиля или истории: '+incoming.athletes[0].name);
     return mutation(s,n=>{n.device.trainerActivated=false;return true;});
   }
-  function merge(s,imported){validate(s);validate(imported);
-    for(const a of imported.athletes)if(s.athletes.some(x=>x.id===a.id))assert(equivalent(profileProjection(s,a.id),profileProjection(imported,a.id)),'Конфликт профиля или истории: '+a.name);
+  function merge(s,imported,{emptyProfile}={}){validate(s);validate(imported);
+    for(const a of imported.athletes)if(a.id!==emptyProfile&&s.athletes.some(x=>x.id===a.id))assert(equivalent(profileProjection(s,a.id),profileProjection(imported,a.id)),'Конфликт профиля или истории: '+a.name);
     return mutation(s,n=>{for(const field of ['athletes',...fields]){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(clone(x));else assert(field==='workouts'?equivalent(comparableWorkout(old),comparableWorkout(x)):equivalent(old,x),'Конфликт при импорте: '+x.id);}}return true;});
   }
   function evaluateImport(s,raw,authorized=false,baseId){
@@ -415,5 +429,5 @@
     points.push(...s.archived.filter(a=>a.athleteId===athleteId).map(a=>({id:a.id,when:a.date,ms:a.bestMs,dateOnly:true})));
     return points.sort((a,b)=>Date.parse(a.when)-Date.parse(b.when)||a.id.localeCompare(b.id));
   }
-  return {SETTINGS_KEY,validateTrainerSettings,defaultTrainerSettings,changeTrainerSettings,validateMeasurementPlan,measurementPlan,workoutPlan,isWorkingAttempt,recordInfo,workingCompleted,workingBest,archivedWorkouts,canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,selectProfile,evaluatePersonalImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
+  return {SETTINGS_KEY,validateTrainerSettings,defaultTrainerSettings,changeTrainerSettings,validateMeasurementPlan,measurementPlan,workoutPlan,isWorkingAttempt,recordInfo,workingCompleted,workingBest,archivedWorkouts,canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,selectProfile,evaluatePersonalImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,clearPersonalHistory,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
 });
