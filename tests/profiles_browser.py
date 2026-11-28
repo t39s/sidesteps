@@ -313,12 +313,12 @@ def test_modes_settings_and_statistics(browser):
     assert p.locator('.chart rect').count()==1
     before=state(p)
     assert [w['measurementPlan']['purpose'] for w in before['workouts']]==['test','working']
-    baseline=p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')
+    baseline=p.evaluate('(()=>{const s=JSON.parse(localStorage.getItem("interval-lab:data:v6"));return ILModel.baseline(s,s.baseProfileId)})()')
     assert baseline==before['attempts'][1]['totalMs']
     p.get_by_text('Добавить результат',exact=True).click()
     p.locator('#archive-date').fill('2026-11-01');p.locator('#archive-time').fill('0,1')
     p.get_by_role('button',name='Добавить в архив',exact=True).click()
-    assert p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')==baseline
+    assert p.evaluate('(()=>{const s=JSON.parse(localStorage.getItem("interval-lab:data:v6"));return ILModel.baseline(s,s.baseProfileId)})()')==baseline
     saved=p.evaluate('window.__dump()');p.close()
     q,errs=make_page(browser,saved,viewport_width=375,mobile=True)
     restored=json.loads(q.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))

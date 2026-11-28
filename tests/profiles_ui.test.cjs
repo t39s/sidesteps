@@ -175,8 +175,8 @@ test('existing installations preserve the accepted work count 20 and settings ch
   assert.deepEqual(p.api.state().workouts[0].measurementPlan,r.state.workouts[0].measurementPlan);
 });
 
-function longListsState(){
-  let s=M.blank();
+function longListsState(profileId='stable-test-profile'){
+  let s=M.blank(profileId);
   for(let i=0;i<7;i++){
     const w=M.startSolo(s,s.baseProfileId,1),a=M.startAttempt(w.state,w.value.id,'intervals',20);
     s=M.finishAttempt(a.state,a.value.id,1000+i*100,Array(20).fill(50+i*5)).state;
@@ -332,4 +332,31 @@ test('full reset clears trainer choices and allows the working count to be chose
   await q.api.handleAction('save-trainer-settings');
   assert.equal(q.api.settings().workingIntervalCount,27);
   assert.equal(q.api.settings().workingCountLocked,true);
+});
+
+test('four independent legacy athlete histories get stable, distinct IDs in new backups', async()=>{
+  const trainer=await page();
+  trainer.api.unlock();
+  await trainer.api.handleAction('pin');
+  const ids=new Set();
+  for(let i=0;i<4;i++){
+    const legacy=longListsState('athlete-default');
+    legacy.archived[0].bestMs+=i;
+    const subject=await page({[M.KEY]:JSON.stringify(legacy)});
+    const out=subject.api.exportSnapshot();
+    const id=out.baseProfileId;
+    assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    ids.add(id);
+    for(const key of ['workouts','attempts','archived','incomplete']){
+      assert.deepEqual(out[key],legacy[key].map(record=>({...record,athleteId:id})));
+    }
+    const reopened=await page(Object.fromEntries(subject.data));
+    assert.equal(reopened.api.state().baseProfileId,id);
+    await reopened.api.importFile({text:async()=>JSON.stringify(legacy)});
+    assert.ok(reopened.messages.includes('Импорт завершён'));
+    await trainer.api.importFile({text:async()=>JSON.stringify(out)});
+    assert.ok(trainer.api.state().athletes.some(profile=>profile.id===id));
+  }
+  assert.equal(ids.size,4);
+  assert.equal(trainer.api.state().athletes.length,4);
 });

@@ -61,7 +61,7 @@ test('two workout comments preserve measurements, support independent edits, and
 });
 
 test('comment archive round trip treats empty and absent equally but rejects text conflicts atomically',()=>{
-  const solo=M.startSolo(M.blank(),'athlete-default',1),a=M.startAttempt(solo.state,solo.value.id,'stopwatch',1);
+  const solo=M.startSolo(M.blank('stable-test-profile'),'stable-test-profile',1),a=M.startAttempt(solo.state,solo.value.id,'stopwatch',1);
   const old=M.finishAttempt(a.state,a.value.id,1900,[]).state;
   const empty=M.clone(old);empty.workouts[0].athleteComment=' \n';empty.workouts[0].trainerComment='';
   assert.deepEqual(M.evaluateImport(old,empty).state.workouts,old.workouts);
@@ -77,7 +77,7 @@ test('comment archive round trip treats empty and absent equally but rejects tex
 });
 
 function completedPair(){
-  let s=M.addAthlete(M.blank(),'Другой').state;
+  let s=M.addAthlete(M.blank('stable-test-profile'),'Другой').state;
   s=M.startChild(s,s.athletes.map(a=>a.id),2).state;
   for(let i=0;i<4;i++){
     const turn=M.nextTurn(s);

@@ -72,7 +72,7 @@ test('first load starts muted with two interval attempts', async () => {
 });
 
 test('reload restores exercise defaults and preserves history and identity', async () => {
-  let state = M.addArchived(M.blank(), 'athlete-default', '2026-11-10', 12345).state;
+  let state = M.addArchived(M.blank('stable-test-profile'), 'stable-test-profile', '2026-11-10', 12345).state;
   state.device.soundEnabled = true;
   state.device.soloPlannedAttempts = 1;
   state.device.soloMeasurementMode = 'stopwatch';
@@ -115,7 +115,7 @@ test('starting another exercise in the same page keeps user choices', async () =
 });
 
 test('reload between attempts preserves the active workout and measurement mode', async () => {
-  const started = M.startSolo(M.blank(), 'athlete-default', 2);
+  const started = M.startSolo(M.blank('stable-test-profile'), 'stable-test-profile', 2);
   const attempt = M.startAttempt(started.state, started.value.id, 'stopwatch', config.workingIntervalCount);
   const finished = M.finishAttempt(attempt.state, attempt.value.id, 2000, []);
   const state = finished.state;
@@ -137,7 +137,7 @@ test('reload between attempts preserves the active workout and measurement mode'
 
 test('reload retains the active participant session and the administrator login boundary', async () => {
   for (const role of ['child', 'trainer']) {
-    const state = M.startChild(M.blank(), ['athlete-default'], 1).state;
+    const state = M.startChild(M.blank('stable-test-profile'), ['stable-test-profile'], 1).state;
     state.device.lastInterface = role;
     state.device.measurementMode = 'stopwatch';
     state.device.soundEnabled = true;

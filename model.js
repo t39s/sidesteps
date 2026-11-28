@@ -10,7 +10,8 @@
   const mins = ms => { ms=Math.max(0,Math.ceil(ms/1000)); return String(Math.floor(ms/60)).padStart(2,'0')+':'+String(ms%60).padStart(2,'0'); };
   const date = s => new Date(s).toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
   const datetime = s => new Date(s).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  const blank = () => ({schemaVersion:6,baseProfileId:'athlete-default',revision:0,athletes:[{id:'athlete-default',name:'Спортсмен'}],workouts:[],attempts:[],childSessions:[],archived:[],incomplete:[],device:{lastInterface:'athlete',trainerActivated:false,soundEnabled:false,selectedAthleteId:'athlete-default',trainerAthleteId:'athlete-default',activeWorkoutId:null,activeChildSessionId:null,childParticipants:[],viewAthleteId:null,measurementMode:'intervals',soloPlannedAttempts:2,soloMeasurementMode:'intervals'}});
+  const LEGACY_DEFAULT_ID='athlete-default';
+  const blank = (profileId=LEGACY_DEFAULT_ID) => ({schemaVersion:6,baseProfileId:profileId,revision:0,athletes:[{id:profileId,name:'Спортсмен'}],workouts:[],attempts:[],childSessions:[],archived:[],incomplete:[],device:{lastInterface:'athlete',trainerActivated:false,soundEnabled:false,selectedAthleteId:profileId,trainerAthleteId:profileId,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[],viewAthleteId:null,measurementMode:'intervals',soloPlannedAttempts:2,soloMeasurementMode:'intervals'}});
   const ensureUnique = (items,n) => { assert(Array.isArray(items),n+' не является массивом');const ids=items.map(x=>x.id);assert(ids.every(x=>typeof x==='string' && x.length>0) && new Set(ids).size===ids.length,'Повторяющиеся ID '+n); };
   function validateV5(s) {
     assert(s && s.schemaVersion===5,'Несовместимая версия данных');
@@ -173,7 +174,7 @@
   const workoutOf = (s,id) => s.workouts.find(w=>w.id===id);
   const attemptOf = (s,id) => s.attempts.find(a=>a.id===id);
   const currentChild = s => s.childSessions.find(c=>c.id===s.device.activeChildSessionId && c.status==='active')||null;
-  function mutation(s,fn){const next=clone(s);const val=fn(next);next.revision++;validate(next);return {state:next,value:val};}
+  function mutation(s,fn){const next=clone(s);const val=fn(next);if(next.device.profileUnconfigured&&!emptyProfileState(next))next.device.profileUnconfigured=false;next.revision++;validate(next);return {state:next,value:val};}
   function athleteName(name){
     const trimmed=typeof name==='string'?name.trim():'';
     assert(trimmed.length>0&&trimmed.length<=50,'Имя: от 1 до 50 символов');
@@ -351,7 +352,50 @@
   const equivalent=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
   const sorted=xs=>[...xs].sort((a,b)=>a.id.localeCompare(b.id));
   function profileProjection(s,aid){return {profile:s.athletes.find(a=>a.id===aid),...Object.fromEntries(fields.map(k=>[k,sorted(s[k].filter(x=>k==='childSessions'?x.athleteIds.includes(aid):x.athleteId===aid)).map(x=>k==='workouts'?comparableWorkout(x):x)]))};}
-  function isPlaceholder(s){return s.athletes.length===1&&s.athletes[0].id==='athlete-default'&&s.athletes[0].name==='Спортсмен'&&fields.every(k=>!s[k].length)&&!s.device.activeWorkoutId&&!s.device.activeChildSessionId;}
+  function emptyProfileState(s){
+    return s.athletes.length===1&&s.athletes[0].name==='Спортсмен'&&fields.every(k=>!s[k].length)&&!s.device.activeWorkoutId&&!s.device.activeChildSessionId;
+  }
+  function isPlaceholder(s){
+    return emptyProfileState(s)&&(s.device.profileUnconfigured===true||
+      (s.device.profileUnconfigured===undefined&&s.baseProfileId===LEGACY_DEFAULT_ID));
+  }
+  function newProfileId(){
+    if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
+    const bytes=new Uint8Array(16);
+    if(typeof crypto!=='undefined'&&crypto.getRandomValues)crypto.getRandomValues(bytes);
+    else for(let i=0;i<bytes.length;i++)bytes[i]=Math.floor(Math.random()*256);
+    bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+    const hex=Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
+    return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+  }
+  function freshState(){
+    const state=blank(newProfileId());
+    state.device.profileUnconfigured=true;
+    return state;
+  }
+  function replaceLegacyProfileId(state,profileId){
+    const next=clone(state);
+    const remap=id=>id===LEGACY_DEFAULT_ID?profileId:id;
+    next.baseProfileId=remap(next.baseProfileId);
+    for(const profile of next.athletes)profile.id=remap(profile.id);
+    for(const field of ['workouts','attempts','archived','incomplete']){
+      for(const record of next[field])record.athleteId=remap(record.athleteId);
+    }
+    for(const session of next.childSessions){
+      session.athleteIds=session.athleteIds.map(remap);
+      for(const turn of session.sequence)turn.athleteId=remap(turn.athleteId);
+    }
+    for(const key of ['selectedAthleteId','trainerAthleteId','viewAthleteId'])next.device[key]=remap(next.device[key]);
+    next.device.childParticipants=next.device.childParticipants.map(remap);
+    return validate(next);
+  }
+  function upgradePersonalProfile(state){
+    if(state.athletes.length!==1||state.baseProfileId!==LEGACY_DEFAULT_ID)return state;
+    const next=replaceLegacyProfileId(state,newProfileId());
+    next.device.profileUnconfigured=isPlaceholder(state);
+    if(!next.device.profileUnconfigured)next.device.legacyDefaultProfileId=next.baseProfileId;
+    return next;
+  }
   function normalizeImport(raw,baseId){return raw.schemaVersion===6?validate(clone(raw)):migrateV5ToV6(raw.schemaVersion===5?raw:migrateV4(raw),baseId);}
   function selectProfile(s,aid){
     validate(s);
@@ -382,8 +426,12 @@
   function evaluatePersonalImport(s,raw,aid){
     validate(s);
     assert(!s.device.activeWorkoutId&&!currentChild(s),'Сначала завершите тренировку или занятие');
-    const incoming=selectProfile(normalizeImport(raw,aid),aid);
+    let incoming=selectProfile(normalizeImport(raw,aid),aid);
     if(isPlaceholder(s))return evaluateImport(s,incoming,false);
+    if(aid===LEGACY_DEFAULT_ID&&s.device.legacyDefaultProfileId===s.baseProfileId){
+      aid=s.baseProfileId;
+      incoming=replaceLegacyProfileId(incoming,aid);
+    }
     assert(aid===s.baseProfileId,'Доступен только базовый профиль');
     assert(equivalent(profileProjection(selectProfile(s,aid),aid),profileProjection(incoming,aid)),
       'Конфликт профиля или истории: '+incoming.athletes[0].name);
@@ -404,7 +452,7 @@
     const incoming=normalizeImport(source,chosen);
     assert(authorized||fresh||incoming.athletes.every(a=>a.id===s.baseProfileId),'Требуется PIN Тренера');
     let r;
-    if(fresh){const n=clone(incoming);n.baseProfileId=chosen;n.revision=s.revision+1;n.device={...s.device,selectedAthleteId:chosen,trainerAthleteId:chosen,viewAthleteId:chosen,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};r={state:validate(n),value:true};}
+    if(fresh){const n=clone(incoming);n.baseProfileId=chosen;n.revision=s.revision+1;n.device={...s.device,profileUnconfigured:false,selectedAthleteId:chosen,trainerAthleteId:chosen,viewAthleteId:chosen,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};r={state:upgradePersonalProfile(validate(n)),value:true};}
     else r=merge(s,incoming);
     r.state.device.trainerActivated=false;return r;
   }
@@ -415,5 +463,5 @@
     points.push(...s.archived.filter(a=>a.athleteId===athleteId).map(a=>({id:a.id,when:a.date,ms:a.bestMs,dateOnly:true})));
     return points.sort((a,b)=>Date.parse(a.when)-Date.parse(b.when)||a.id.localeCompare(b.id));
   }
-  return {SETTINGS_KEY,validateTrainerSettings,defaultTrainerSettings,changeTrainerSettings,validateMeasurementPlan,measurementPlan,workoutPlan,isWorkingAttempt,recordInfo,workingCompleted,workingBest,archivedWorkouts,canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,selectProfile,evaluatePersonalImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
+  return {SETTINGS_KEY,validateTrainerSettings,defaultTrainerSettings,changeTrainerSettings,validateMeasurementPlan,measurementPlan,workoutPlan,isWorkingAttempt,recordInfo,workingCompleted,workingBest,archivedWorkouts,canEditWorkoutComment,saveWorkoutComments,KEY,LEGACY_KEY,V5_KEY,validateV5,migrateV5ToV6,setBaseProfile,deleteProfileAndRebase,normalizeImport,evaluateImport,selectProfile,evaluatePersonalImport,isPlaceholder,profileProjection,equivalent,id,iso,fmt,mins,date,datetime,blank,freshState,upgradePersonalProfile,validate,clone,mutation,addAthlete,renameAthlete,addArchived,newWorkout,startSolo,startChild,startAttempt,finishAttempt,interruptAttempt,closeWorkout,expireSolo,forceCloseChild,recover,checkpointAttempt,cancelAttempt,endWorkout,eventLog,deleteRecord,migrateV4,merge,completed,best,baseline,publicWorkouts,workoutOf,attemptOf,currentChild,nextTurn,deadline,renderChartData};
 });
