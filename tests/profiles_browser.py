@@ -180,7 +180,7 @@ def test_personal_data_management(browser):
     p.get_by_role('button',name='Настройки',exact=True).click()
     headings=p.locator('.panel > h2').all_text_contents()
     assert headings==['Название профиля','История'],headings
-    assert p.locator('[data-act=export-json]').count()==0
+    assert p.get_by_role('button',name='Сохранить копию',exact=True).count()==0
     switch=p.get_by_role('switch',name='Показывать кнопки удаления в Истории')
     assert not switch.is_checked()
     switch.check()
@@ -274,7 +274,7 @@ def test_personal_profile_selection(browser):
     selected=json.loads(raw)['athletes'][1]['id']
     p.locator('#base-choice').select_option(selected)
     p.get_by_role('button',name='Загрузить профиль',exact=True).click()
-    p.get_by_role('heading',name='Резервное копирование всех данных',exact=True).wait_for()
+    p.get_by_role('heading',name='Резервное копирование',exact=True).wait_for()
     assert state(p)['baseProfileId']==selected
     assert len(state(p)['athletes'])==1
     assert len(state(p)['archived'])==1
@@ -313,12 +313,12 @@ def test_modes_settings_and_statistics(browser):
     assert p.locator('.chart rect').count()==1
     before=state(p)
     assert [w['measurementPlan']['purpose'] for w in before['workouts']]==['test','working']
-    baseline=p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')
+    baseline=p.evaluate('(()=>{const s=JSON.parse(localStorage.getItem("interval-lab:data:v6"));return ILModel.baseline(s,s.baseProfileId)})()')
     assert baseline==before['attempts'][1]['totalMs']
     p.get_by_text('Добавить результат',exact=True).click()
     p.locator('#archive-date').fill('2026-11-01');p.locator('#archive-time').fill('0,1')
     p.get_by_role('button',name='Добавить в архив',exact=True).click()
-    assert p.evaluate('ILModel.baseline(JSON.parse(localStorage.getItem("interval-lab:data:v6")),"athlete-default")')==baseline
+    assert p.evaluate('(()=>{const s=JSON.parse(localStorage.getItem("interval-lab:data:v6"));return ILModel.baseline(s,s.baseProfileId)})()')==baseline
     saved=p.evaluate('window.__dump()');p.close()
     q,errs=make_page(browser,saved,viewport_width=375,mobile=True)
     restored=json.loads(q.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))

@@ -4,7 +4,7 @@ async function page(initial={},options={}){
  const data=new Map(Object.entries(initial)),nodes={},events={},appEvents={},messages=[];let failedKey;
  const app={innerHTML:'',querySelector:()=>null,querySelectorAll:()=>[],addEventListener:(k,v)=>appEvents[k]=v};
  const store={getItem:k=>{const value=data.get(k)??null;options.onRead?.(k,data);return value;},setItem(k,v){if(failedKey===true||failedKey===k)throw Error('Quota exceeded');data.set(k,v);},removeItem:k=>data.delete(k)};
- const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirmations?.shift()??options.confirm!==false,prompt:()=>null};
+ const browser={ILModel:M,SideMigration:require('../migration.js'),addEventListener:(k,v)=>events[k]=v,confirm:()=>options.confirm!==false,prompt:()=>null};
  const hooks=`window.api={init,handleAction,importFile,exportSnapshot,operate,statsPoints,recordAsOf,workoutDetails,archiveHistory,historyItems,interruptedAttempts,expanded:key=>expandedLists.has(key),settings:()=>trainerSettings(),state:()=>db,authorized:()=>trainerUnlocked,unlock:()=>{trainerUnlocked=true;},screen:()=>screen};`;
  vm.runInNewContext(source.replace('init();\n})();',hooks+'\ninit();\n})();'),{
  window:browser,document:{getElementById:k=>k==='app'?app:k==='toast'?{style:{},set textContent(v){messages.push(v);}}:nodes[k],addEventListener(){}},
@@ -43,29 +43,8 @@ test('personal history scopes manual archive input and data exchange has its own
   assert.equal(p.api.state().archived[0].athleteId,p.api.state().baseProfileId);
   assert.equal(p.api.state().archived[0].bestMs,12345);
   assert.equal(p.api.authorized(),false);
-  await p.api.handleAction('data-exchange');assert.match(p.html(),/Резервное копирование всех данных[\s\S]*Сохранить/);
+  await p.api.handleAction('data-exchange');assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
 });
-test('personal backup deletes only the base history and permits restoring a copy',async()=>{
-  let s=M.addAthlete(M.blank(),'Другой спортсмен').state;
-  const aid=s.baseProfileId,other=s.athletes[1].id;
-  s=M.renameAthlete(s,aid,'Мой профиль').state;
-  s=M.addArchived(s,aid,'2026-11-01',2000).state;
-  s=M.addArchived(s,other,'2026-11-02',3100).state;
-  const confirmations=[true,false,true,true],p=await page({[M.KEY]:JSON.stringify(s)},{confirmations});
-  await p.api.handleAction('data-exchange');
-  const backup=p.api.exportSnapshot(),before=p.data.get(M.KEY);
-  await p.api.handleAction('reset-personal');
-  assert.equal(p.data.get(M.KEY),before);
-  await p.api.handleAction('reset-personal');
-  assert.equal(p.api.screen(),'athlete');
-  assert.deepEqual(p.api.state().athletes,s.athletes);
-  assert.deepEqual(p.api.state().archived,s.archived.filter(a=>a.athleteId===other));
-  assert.deepEqual(confirmations,[]);
-  await p.api.handleAction('data-exchange');
-  await p.api.importFile({text:async()=>JSON.stringify(backup)});
-  assert.deepEqual(p.api.state().archived.map(a=>a.id).sort(),s.archived.map(a=>a.id).sort());
-});
-
 test('personal deletion cancellation and write failure leave exact bytes unchanged',async()=>{
   const s=M.addArchived(M.blank(),'athlete-default','2026-11-01',2000).state;
   for(const cancel of [true,false]){
@@ -104,7 +83,7 @@ test('personal profile rename preserves identity and history in export and reloa
   s=M.addArchived(s,s.baseProfileId,'2026-11-01',1000).state;
   const p=await page({[M.KEY]:JSON.stringify(s)});
   await p.api.handleAction('data-exchange');
-  assert.match(p.html(),/Резервное копирование всех данных[\s\S]*Сохранить/);
+  assert.match(p.html(),/Резервное копирование[\s\S]*Сохранить копию/);
   assert.doesNotMatch(p.html(),/profile-name/);
   await p.api.handleAction('data-exchange-back');
   await p.api.handleAction('settings');
@@ -196,8 +175,8 @@ test('existing installations preserve the accepted work count 20 and settings ch
   assert.deepEqual(p.api.state().workouts[0].measurementPlan,r.state.workouts[0].measurementPlan);
 });
 
-function longListsState(){
-  let s=M.blank();
+function longListsState(profileId='stable-test-profile'){
+  let s=M.blank(profileId);
   for(let i=0;i<7;i++){
     const w=M.startSolo(s,s.baseProfileId,1),a=M.startAttempt(w.state,w.value.id,'intervals',20);
     s=M.finishAttempt(a.state,a.value.id,1000+i*100,Array(20).fill(50+i*5)).state;
@@ -353,4 +332,31 @@ test('full reset clears trainer choices and allows the working count to be chose
   await q.api.handleAction('save-trainer-settings');
   assert.equal(q.api.settings().workingIntervalCount,27);
   assert.equal(q.api.settings().workingCountLocked,true);
+});
+
+test('four independent legacy athlete histories get stable, distinct IDs in new backups', async()=>{
+  const trainer=await page();
+  trainer.api.unlock();
+  await trainer.api.handleAction('pin');
+  const ids=new Set();
+  for(let i=0;i<4;i++){
+    const legacy=longListsState('athlete-default');
+    legacy.archived[0].bestMs+=i;
+    const subject=await page({[M.KEY]:JSON.stringify(legacy)});
+    const out=subject.api.exportSnapshot();
+    const id=out.baseProfileId;
+    assert.match(id,/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    ids.add(id);
+    for(const key of ['workouts','attempts','archived','incomplete']){
+      assert.deepEqual(out[key],legacy[key].map(record=>({...record,athleteId:id})));
+    }
+    const reopened=await page(Object.fromEntries(subject.data));
+    assert.equal(reopened.api.state().baseProfileId,id);
+    await reopened.api.importFile({text:async()=>JSON.stringify(legacy)});
+    assert.ok(reopened.messages.includes('Импорт завершён'));
+    await trainer.api.importFile({text:async()=>JSON.stringify(out)});
+    assert.ok(trainer.api.state().athletes.some(profile=>profile.id===id));
+  }
+  assert.equal(ids.size,4);
+  assert.equal(trainer.api.state().athletes.length,4);
 });

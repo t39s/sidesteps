@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
-        assert version.inner_text()=='Версия 0.3.6-rc.1'
+        assert version.inner_text()=='Версия 0.3.6-rc.2'
         assert login.is_visible()
         page.get_by_role('tab',name='Новая тренировка').click()
         page.get_by_role('button',name='Настройки',exact=True).click()
@@ -58,11 +58,10 @@ with sync_playwright() as playwright:
         assert backup.bounding_box()['height']==heights[0]
         assert backup.evaluate('(e)=>getComputedStyle(e).backgroundColor')==save_background
         backup.click()
-        assert page.get_by_role('heading',name='Резервное копирование всех данных',exact=True).is_visible()
+        assert page.get_by_role('heading',name='Резервное копирование',exact=True).is_visible()
         assert page.locator('#profile-name').count()==0
-        assert page.get_by_role('button',name='Сохранить',exact=True).is_visible()
-        assert page.get_by_role('button',name='Восстановить',exact=True).is_visible()
-        assert page.get_by_role('button',name='Удалить',exact=True).is_visible()
+        assert page.get_by_role('button',name='Сохранить копию',exact=True).is_visible()
+        assert page.get_by_role('button',name='Восстановить данные',exact=True).is_visible()
         page.get_by_role('button',name='Назад',exact=True).click()
         login.click()
         assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
@@ -89,7 +88,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.1'
+        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.2'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

@@ -55,7 +55,7 @@ test('legacy classification retains IDs and all original data, including unknown
   assert.equal(M.publicWorkouts(s,aid).length,0);assert.equal(M.archivedWorkouts(s,aid).length,3);
   assert.ok(s.attempts.every(a=>!M.recordInfo(s,a).recordEvent));
   const imported=M.evaluatePersonalImport(M.blank(),JSON.parse(before),aid).state;
-  for(const k of ['workouts','attempts','archived'])assert.deepEqual(imported[k],s[k]);
+  for(const k of ['workouts','attempts','archived'])assert.deepEqual(imported[k],s[k].map(record=>({...record,athleteId:imported.baseProfileId})));
   assert.equal(JSON.stringify(s),before);
 });
 test('new working count 30 is eligible while a legacy 30 result stays archived',()=>{
