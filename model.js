@@ -437,6 +437,19 @@
       'Конфликт профиля или истории: '+incoming.athletes[0].name);
     return mutation(s,n=>{n.device.trainerActivated=false;return true;});
   }
+  function preserveTrainerEdits(s,incoming){
+    const names=new Map(s.athletes.map(profile=>[profile.id,profile.name]));
+    const workouts=new Map(s.workouts.map(workout=>[workout.id,workout]));
+    for(const profile of incoming.athletes){
+      if(names.has(profile.id))profile.name=names.get(profile.id);
+    }
+    for(const workout of incoming.workouts){
+      const local=workouts.get(workout.id);
+      if(!local)continue;
+      if(Object.hasOwn(local,'trainerComment'))workout.trainerComment=local.trainerComment;
+      else delete workout.trainerComment;
+    }
+  }
   function merge(s,imported){validate(s);validate(imported);
     for(const a of imported.athletes)if(s.athletes.some(x=>x.id===a.id))assert(equivalent(profileProjection(s,a.id),profileProjection(imported,a.id)),'Конфликт профиля или истории: '+a.name);
     return mutation(s,n=>{for(const field of ['athletes',...fields]){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(clone(x));else assert(field==='workouts'?equivalent(comparableWorkout(old),comparableWorkout(x)):equivalent(old,x),'Конфликт при импорте: '+x.id);}}return true;});
@@ -453,7 +466,10 @@
     assert(authorized||fresh||incoming.athletes.every(a=>a.id===s.baseProfileId),'Требуется PIN Тренера');
     let r;
     if(fresh){const n=clone(incoming);n.baseProfileId=chosen;n.revision=s.revision+1;n.device={...s.device,profileUnconfigured:false,selectedAthleteId:chosen,trainerAthleteId:chosen,viewAthleteId:chosen,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};r={state:upgradePersonalProfile(validate(n)),value:true};}
-    else r=merge(s,incoming);
+    else{
+      if(authorized)preserveTrainerEdits(s,incoming);
+      r=merge(s,incoming);
+    }
     r.state.device.trainerActivated=false;return r;
   }
   function renderChartData(s,athleteId,includeArchive=false){

@@ -360,3 +360,37 @@ test('four independent legacy athlete histories get stable, distinct IDs in new 
   assert.equal(ids.size,4);
   assert.equal(trainer.api.state().athletes.length,4);
 });
+
+test('coach repeat import preserves local name and trainer comments and rejects changed results',async()=>{
+  const aid='imported-athlete';
+  let source=M.renameAthlete(M.blank(aid),aid,'Имя из файла').state;
+  for(let i=0;i<2;i++){
+    const workout=M.startSolo(source,aid,1);
+    const attempt=M.startAttempt(workout.state,workout.value.id,'stopwatch',1);
+    source=M.finishAttempt(attempt.state,attempt.value.id,2000,[]).state;
+  }
+  const [first,second]=source.workouts;
+  source=M.saveWorkoutComments(source,second.id,{trainerComment:'Старый комментарий'},true).state;
+  const savedCopy=JSON.stringify(source);
+  const coach=await page();
+  coach.api.unlock();
+  await coach.api.handleAction('pin');
+  await coach.api.importFile({text:async()=>savedCopy});
+  assert.equal(coach.api.state().workouts[1].trainerComment,'Старый комментарий');
+  coach.api.operate(s=>M.renameAthlete(s,aid,'Имя у тренера'));
+  coach.api.operate(s=>M.saveWorkoutComments(s,first.id,{trainerComment:'Новый комментарий'},true));
+  coach.api.operate(s=>M.saveWorkoutComments(s,second.id,{trainerComment:''},true));
+  const edited=coach.api.state();
+  await coach.api.importFile({text:async()=>savedCopy});
+  assert.equal(coach.messages.at(-1),'Импорт завершён');
+  assert.equal(coach.api.state().athletes[0].name,'Имя у тренера');
+  assert.deepEqual(coach.api.state().workouts,edited.workouts);
+  assert.deepEqual(coach.api.state().attempts,edited.attempts);
+
+  const beforeConflict=coach.data.get(M.KEY);
+  const changedResult=M.clone(source);
+  changedResult.attempts[0].totalMs+=100;
+  await coach.api.importFile({text:async()=>JSON.stringify(changedResult)});
+  assert.match(coach.messages.at(-1),/Конфликт профиля или истории/);
+  assert.equal(coach.data.get(M.KEY),beforeConflict);
+});
