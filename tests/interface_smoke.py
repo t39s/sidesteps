@@ -21,8 +21,11 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
-        assert version.inner_text()=='Версия 0.3.6-rc.6'
+        assert version.inner_text()=='Версия 0.3.6-rc.7'
         assert login.is_visible()
+        button_style='e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.fontSize,s.borderRadius,s.padding]}'
+        login_style=login.evaluate(button_style)
+        login_box=login.bounding_box()
         assert page.title()=='Приставные шаги на время'
         page.get_by_role('tab',name='Новая тренировка').click()
         page.get_by_role('button',name='Настройки',exact=True).click()
@@ -87,20 +90,24 @@ with sync_playwright() as playwright:
         assert page.evaluate('scrollY')==0
         page.locator('#pin-input').fill(PIN)
         page.get_by_role('button',name='Войти',exact=True).click()
-        page.get_by_role('button', name='Интерфейс спортсмена', exact=True).wait_for()
+        page.get_by_role('button', name='Выход из интерфейса тренера', exact=True).wait_for()
         assert page.evaluate('scrollY')==0
-        assert page.get_by_role('button', name='Интерфейс спортсмена', exact=True).count() == 1
-        assert page.locator('header').get_by_role('button', name='Интерфейс спортсмена', exact=True).count() == 0
+        assert page.get_by_role('button', name='Выход из интерфейса тренера', exact=True).count() == 1
+        assert page.locator('header').get_by_role('button', name='Выход из интерфейса тренера', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.6'
-        exit_button=footer.get_by_role('button',name='Интерфейс спортсмена',exact=True)
-        assert exit_button.bounding_box()['y']+exit_button.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
-        footer.get_by_role('button', name='Интерфейс спортсмена', exact=True).click()
+        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.7'
+        exit_button=footer.get_by_role('button',name='Выход из интерфейса тренера',exact=True)
+        exit_box=exit_button.bounding_box()
+        assert exit_button.evaluate(button_style)==login_style
+        assert abs(exit_box['width']-login_box['width'])<1
+        assert abs(exit_box['height']-login_box['height'])<1
+        assert exit_box['y']+exit_box['height']<=footer.locator('.app-version').bounding_box()['y']
+        footer.get_by_role('button', name='Выход из интерфейса тренера', exact=True).click()
         assert page.get_by_role('tab', name='История', exact=True).is_visible()
         assert page.evaluate('scrollY')==0
         assert login.is_visible()
-        assert not page.get_by_role('button', name='Интерфейс спортсмена', exact=True).count()
+        assert not page.get_by_role('button', name='Выход из интерфейса тренера', exact=True).count()
         assert not errors, errors
         page.close()
         print('PASS interface navigation', width, flush=True)

@@ -70,7 +70,7 @@ def test_profiles(browser):
     p.locator('#mode-select').select_option('stopwatch')
     p.get_by_role('button',name='Начать занятие').click()
     assert p.locator('#pin-input').count()==0
-    exit_button=p.get_by_role('button',name='Интерфейс спортсмена')
+    exit_button=p.get_by_role('button',name='Выход из интерфейса тренера')
     assert exit_button.count()==0
     p.get_by_role('link',name='К управлению занятием').click()
     # Exit on the trainer overview cannot drop an active session or its current turn.
@@ -92,7 +92,7 @@ def test_profiles(browser):
     p.get_by_role('link',name='К управлению занятием').click()
     assert p.get_by_role('button',name='Начать занятие').is_visible()
     assert p.locator('#pin-input').count()==0
-    p.get_by_role('button',name='Интерфейс спортсмена').click()
+    p.get_by_role('button',name='Выход из интерфейса тренера').click()
     new_exercise(p,attempts=1,mode='stopwatch');tap(p);tap(p)
     p.get_by_role('heading',name='Тренировка завершена').wait_for(timeout=6500)
     assert state(p)['attempts'][1]['athleteId']==state(p)['baseProfileId']
@@ -294,7 +294,7 @@ def test_modes_settings_and_statistics(browser):
     assert p.locator('#working-count').count()==0
     settings=json.loads(p.evaluate('(key)=>localStorage.getItem(key)','sidesteps:trainer-settings:v1'))
     assert settings['workingIntervalCount']==30 and settings['workingCountLocked']
-    p.get_by_role('button',name='Интерфейс спортсмена',exact=True).click()
+    p.get_by_role('button',name='Выход из интерфейса тренера',exact=True).click()
     new_exercise(p,attempts=1,mode='test-intervals')
     assert p.get_by_text('Тестовый режим · результат сохранится в архив',exact=True).is_visible()
     for _ in range(4):tap(p)
@@ -334,7 +334,7 @@ def test_frozen_test_workout_after_settings_and_reload(browser):
     trainer(p)
     p.locator('#test-count').fill('3');p.locator('#test-rest').fill('30')
     p.get_by_role('button',name='Сохранить настройки',exact=True).click()
-    p.get_by_role('button',name='Интерфейс спортсмена',exact=True).click()
+    p.get_by_role('button',name='Выход из интерфейса тренера',exact=True).click()
     new_exercise(p,attempts=2,mode='test-intervals')
     for _ in range(4):tap(p)
     assert state(p)['workouts'][0]['measurementPlan']['targetIntervals']==3
@@ -494,7 +494,7 @@ def test_archive_statistics_switch(browser):
     assert p.locator('.chart rect').count()==1
     assert 'Рабочие, тестовые и архивные данные' in p.locator('.statistics-scope').inner_text()
     p.get_by_role('button',name='Назад',exact=True).click()
-    p.get_by_role('button',name='Интерфейс спортсмена',exact=True).click()
+    p.get_by_role('button',name='Выход из интерфейса тренера',exact=True).click()
     assert p.locator('#include-archive-stats').count()==0
     assert p.locator('.chart rect').count()==4
     assert '1,650' in p.locator('.chart-average title').text_content()
@@ -510,7 +510,7 @@ def test_archive_statistics_switch(browser):
     trainer(p)
     p.get_by_label('Учитывать тестовые и архивные данные',exact=True).uncheck()
     p.get_by_role('button',name='Сохранить настройки',exact=True).click()
-    p.get_by_role('button',name='Интерфейс спортсмена',exact=True).click()
+    p.get_by_role('button',name='Выход из интерфейса тренера',exact=True).click()
     assert p.locator('.chart rect').count()==1
     assert 'Только рабочие данные' in p.locator('.statistics-scope').inner_text()
     assert p.locator('.archive-history .record').count()==0
