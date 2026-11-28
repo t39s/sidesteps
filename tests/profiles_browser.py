@@ -439,13 +439,14 @@ def test_trainer_backup_geometry(browser):
     for width in (320,375):
         p,errors=make_page(browser,viewport_width=width,mobile=True)
         trainer(p)
+        assert p.get_by_role('heading',name='Данные профилей',exact=True).is_visible()
         backups=p.locator('.backup-actions')
-        export=backups.get_by_role('button',name='Выгрузить',exact=True).bounding_box()
-        load=backups.get_by_role('button',name='Загрузить',exact=True).bounding_box()
+        export=backups.get_by_role('button',name='Резервная копия всех данных',exact=True).bounding_box()
+        load=backups.get_by_role('button',name='Загрузить новые тренировки',exact=True).bounding_box()
         reset=backups.get_by_role('button',name='Удалить все локальные данные',exact=True).bounding_box()
-        assert abs(export['width']-load['width'])<1 and abs(export['y']-load['y'])<1
-        assert reset['y']>=export['y']+export['height']
-        assert abs(reset['width']-backups.bounding_box()['width'])<1
+        assert load['y']>=export['y']+export['height']
+        assert reset['y']>=load['y']+load['height']
+        assert all(abs(box['width']-backups.bounding_box()['width'])<1 for box in (export,load,reset))
         add=p.get_by_role('button',name='Добавить в архив',exact=True)
         assert add.count()==0
         p.locator('[data-act="trainer-history"]').first.click()

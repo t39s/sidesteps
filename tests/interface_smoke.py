@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
-        assert version.inner_text()=='Версия 0.3.6-rc.4'
+        assert version.inner_text()=='Версия 0.3.6-rc.5'
         assert login.is_visible()
         assert page.title()=='Приставные шаги на время'
         page.get_by_role('tab',name='Новая тренировка').click()
@@ -90,7 +90,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.4'
+        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.5'
         exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
         assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()

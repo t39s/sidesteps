@@ -1,6 +1,6 @@
-sidesteps v0.3.6-rc.4
+sidesteps v0.3.6-rc.5
 Candidate date: 2026-11-28
 Status: PREVIEW
 Branch: develop
 Stable baseline: v0.3.5, main 7196e43a2fd6ad1d67f1ec9bf9341489cd867040
-Changes: Coach imports append newer workouts for known profiles and load all history for new profiles. A saved per-profile cutoff survives removal of individual workouts.
+Changes: Rename the coach profile data block and its backup and import actions, and lay out the actions as full-width rows.
