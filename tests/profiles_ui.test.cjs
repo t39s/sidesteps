@@ -394,3 +394,50 @@ test('coach repeat import preserves local name and trainer comments and rejects 
   assert.match(coach.messages.at(-1),/Конфликт профиля или истории/);
   assert.equal(coach.data.get(M.KEY),beforeConflict);
 });
+
+test('coach adds only newer workouts for a known profile and restores all history for a new profile',async()=>{
+  const aid='chronological-athlete';
+  let source=M.renameAthlete(M.blank(aid),aid,'Имя из файла').state;
+  const addWorkout=(state,day)=>{
+    const time=`2026-11-${day}T10:00:00.000Z`;
+    const started=M.startSolo(state,aid,1);
+    started.value.createdAt=time;
+    const attempt=M.startAttempt(started.state,started.value.id,'stopwatch',1,time);
+    return M.finishAttempt(attempt.state,attempt.value.id,2000,[]).state;
+  };
+  for(const day of [20,21,22])source=addWorkout(source,day);
+  const [first,middle,latest]=source.workouts;
+  const store=await page();
+  store.api.unlock();
+  await store.api.handleAction('pin');
+  await store.api.importFile({text:async()=>JSON.stringify(source)});
+  store.api.operate(s=>M.deleteRecord(s,'workout',middle.id,true));
+  store.api.operate(s=>M.deleteRecord(s,'workout',latest.id,true));
+  store.api.operate(s=>M.renameAthlete(s,aid,'Имя у тренера'));
+
+  const coach=await page(Object.fromEntries(store.data));
+  coach.api.unlock();
+  await coach.api.handleAction('pin');
+  let incoming=addWorkout(addWorkout(source,22),23);
+  const newer=incoming.workouts.at(-1);
+  const other=M.addAthlete(incoming,'Новый спортсмен');
+  incoming=M.addArchived(other.state,other.value.id,'2025-01-01',1900).state;
+  const file={text:async()=>JSON.stringify(incoming)};
+  for(let repeat=0;repeat<2;repeat++){
+    await coach.api.importFile(file);
+    assert.equal(coach.messages.at(-1),'Импорт завершён');
+    const saved=coach.api.state();
+    assert.deepEqual(saved.workouts.map(w=>w.id),[first.id,newer.id]);
+    assert.deepEqual(saved.attempts.map(a=>a.workoutId),[first.id,newer.id]);
+    assert.equal(saved.athletes[0].name,'Имя у тренера');
+    assert.equal(saved.archived[0].athleteId,other.value.id);
+  }
+
+  const older={text:async()=>JSON.stringify(M.mutation(source,n=>{
+    n.workouts=n.workouts.slice(0,1);
+    n.attempts=n.attempts.filter(a=>a.workoutId===first.id);
+  }).state)};
+  await coach.api.importFile(older);
+  assert.equal(coach.messages.at(-1),'Импорт завершён');
+  assert.deepEqual(coach.api.state().workouts.map(w=>w.id),[first.id,newer.id]);
+});

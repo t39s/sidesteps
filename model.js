@@ -110,6 +110,10 @@
     assert(s?.schemaVersion===6,'Несовместимая версия данных');
     validateV5({...s,schemaVersion:5});
     const ids=new Set(s.athletes.map(a=>a.id)), wm=new Map(s.workouts.map(w=>[w.id,w])), am=new Map(s.attempts.map(a=>[a.id,a]));
+    if(s.coachImportCutoffs!==undefined){
+      assert(s.coachImportCutoffs&&typeof s.coachImportCutoffs==='object'&&!Array.isArray(s.coachImportCutoffs)&&
+        Object.entries(s.coachImportCutoffs).every(([id,time])=>ids.has(id)&&Number.isSafeInteger(time)),'Некорректная граница загрузки');
+    }
     assert(ids.has(s.baseProfileId),'Не назначен базовый профиль');
     assert(s.incomplete.every(a=>ids.has(a.athleteId)),'Неполная попытка без профиля');
     for(const k of ['selectedAthleteId','trainerAthleteId','viewAthleteId'])assert(s.device[k]==null||ids.has(s.device[k]),'Некорректный указатель профиля');
@@ -293,12 +297,14 @@
           }
           if(entry.status==='interrupted'&&w.attemptIds.length)return true;
         }
+        if(trainer)rememberCoachCutoff(n,w.athleteId);
         n.attempts=n.attempts.filter(a=>a.workoutId!==w.id);
         n.workouts=n.workouts.filter(x=>x.id!==w.id);
         if(n.device.activeWorkoutId===w.id)n.device.activeWorkoutId=null;
         pruneHistoricalSessions(n);
         return true;
       }
+      if(trainer&&type==='archived')rememberCoachCutoff(n,entry.athleteId);
       n[collection]=n[collection].filter(x=>x.id!==entryId);
       return true;
     });
@@ -308,6 +314,7 @@
     assert(workoutOf(n,n.device.activeWorkoutId)?.athleteId!==aid&& !currentChild(n)?.athleteIds.includes(aid),'Сначала завершите тренировку или занятие');
     if(n.baseProfileId===aid){assert(replacementId!==aid&&n.athletes.some(a=>a.id===replacementId),'Выберите замену базового профиля');n.baseProfileId=replacementId;}
     n.athletes=n.athletes.filter(a=>a.id!==aid);
+    if(n.coachImportCutoffs)delete n.coachImportCutoffs[aid];
     for(const k of ['workouts','attempts','archived','incomplete'])n[k]=n[k].filter(x=>x.athleteId!==aid);
     // Retain other participants' results and project the historical session onto them.
     n.childSessions=n.childSessions.filter(c=>{const removed=c.sequence.slice(0,c.nextIndex).filter(t=>t.athleteId===aid).length;
@@ -377,6 +384,9 @@
     const next=clone(state);
     const remap=id=>id===LEGACY_DEFAULT_ID?profileId:id;
     next.baseProfileId=remap(next.baseProfileId);
+    if(Object.hasOwn(next.coachImportCutoffs??{},LEGACY_DEFAULT_ID)){
+      next.coachImportCutoffs={[profileId]:next.coachImportCutoffs[LEGACY_DEFAULT_ID]};
+    }
     for(const profile of next.athletes)profile.id=remap(profile.id);
     for(const field of ['workouts','attempts','archived','incomplete']){
       for(const record of next[field])record.athleteId=remap(record.athleteId);
@@ -406,17 +416,9 @@
     for(const field of ['workouts','attempts','archived','incomplete']){
       n[field]=n[field].filter(x=>x.athleteId===aid);
     }
-    n.childSessions=n.childSessions.filter(c=>c.athleteIds.includes(aid)).map(c=>{
-      const index=c.athleteIds.indexOf(aid);
-      const workoutId=c.workoutIds[index];
-      const nextIndex=c.sequence.slice(0,c.nextIndex).filter(t=>t.athleteId===aid).length;
-      c.athleteIds=[aid];
-      c.workoutIds=[workoutId];
-      c.sequence=c.sequence.filter(t=>t.athleteId===aid);
-      c.nextIndex=nextIndex;
-      if(c.unavailableWorkoutIds)c.unavailableWorkoutIds=c.unavailableWorkoutIds.filter(id=>id===workoutId);
-      return c;
-    });
+    n.childSessions=n.childSessions.filter(c=>c.athleteIds.includes(aid)).map(c=>
+      projectSession(c,new Set([c.workoutIds[c.athleteIds.indexOf(aid)]])));
+    delete n.coachImportCutoffs;
     n.device={...n.device,trainerActivated:false,lastInterface:'athlete',
       selectedAthleteId:aid,trainerAthleteId:aid,viewAthleteId:aid,
       activeWorkoutId:n.workouts.some(w=>w.id===n.device.activeWorkoutId)?n.device.activeWorkoutId:null,
@@ -450,9 +452,101 @@
       else delete workout.trainerComment;
     }
   }
+  function projectSession(session,workoutIds){
+    const kept=workout=>workoutIds.has(workout);
+    const result={...session,
+      athleteIds:session.athleteIds.filter((_,index)=>kept(session.workoutIds[index])),
+      workoutIds:session.workoutIds.filter(kept),
+      sequence:session.sequence.filter(turn=>kept(turn.workoutId)),
+      nextIndex:session.sequence.slice(0,session.nextIndex).filter(turn=>kept(turn.workoutId)).length};
+    if(session.unavailableWorkoutIds)result.unavailableWorkoutIds=session.unavailableWorkoutIds.filter(kept);
+    return result;
+  }
+  const workoutTime=w=>Number.isFinite(Date.parse(w.firstStartedAt))?Date.parse(w.firstStartedAt):Date.parse(w.createdAt);
+  const archiveTime=entry=>Date.parse(entry.date+'T00:00:00Z');
+  function advanceCutoff(cutoffs,aid,time){
+    if(Number.isFinite(time)&&time>(cutoffs.get(aid)??-Infinity))cutoffs.set(aid,time);
+  }
+  function coachCutoffs(state){
+    const saved=state.coachImportCutoffs??{};
+    const cutoffs=new Map(Object.entries(saved));
+    for(const workout of state.workouts){
+      if(!Object.hasOwn(saved,workout.athleteId))advanceCutoff(cutoffs,workout.athleteId,workoutTime(workout));
+    }
+    for(const entry of state.archived){
+      if(!Object.hasOwn(saved,entry.athleteId))advanceCutoff(cutoffs,entry.athleteId,archiveTime(entry));
+    }
+    return cutoffs;
+  }
+  function rememberCoachCutoff(state,aid){
+    if(Object.hasOwn(state.coachImportCutoffs??{},aid))return;
+    const time=coachCutoffs(state).get(aid);
+    if(time!==undefined)state.coachImportCutoffs={...state.coachImportCutoffs,[aid]:time};
+  }
+  function appendRecords(state,incoming,conflictMessage){
+    for(const field of ['athletes',...fields]){
+      const existing=new Map(state[field].map(record=>[record.id,record]));
+      const comparable=field==='workouts'?comparableWorkout:record=>record;
+      for(const record of incoming[field]){
+        const local=existing.get(record.id);
+        if(!local)state[field].push(clone(record));
+        else assert(equivalent(comparable(local),comparable(record)),conflictMessage??'Конфликт при импорте: '+record.id);
+      }
+    }
+  }
+  function mergeCoachHistory(s,incoming){
+    preserveTrainerEdits(s,incoming);
+    const profileIds=new Set(s.athletes.map(profile=>profile.id));
+    const isNew=aid=>!profileIds.has(aid);
+    const cutoffs=coachCutoffs(s);
+    const cutoff=aid=>cutoffs.get(aid)??-Infinity;
+    const localIds=field=>new Set(s[field].map(record=>record.id));
+    const conflicts='Конфликт профиля или истории: '+incoming.athletes.map(profile=>profile.name).join(', ');
+    // Independent legacy installations could assign the same default ID.
+    if(profileIds.has(LEGACY_DEFAULT_ID)&&incoming.athletes.some(profile=>profile.id===LEGACY_DEFAULT_ID)){
+      assert(equivalent(profileProjection(s,LEGACY_DEFAULT_ID),profileProjection(incoming,LEGACY_DEFAULT_ID)),conflicts);
+    }
+    const localWorkouts=new Map(s.workouts.map(workout=>[workout.id,workout]));
+    const workouts=incoming.workouts.filter(w=>localWorkouts.has(w.id)||isNew(w.athleteId)||workoutTime(w)>cutoff(w.athleteId));
+    const retained=new Set(workouts.map(workout=>workout.id));
+    for(const workout of workouts){
+      const local=localWorkouts.get(workout.id);
+      if(local?.closeReason==='deleted_attempt'&&local.attemptIds.every(id=>workout.attemptIds.includes(id))){
+        workout.attemptIds=[...local.attemptIds];
+        workout.closeReason=local.closeReason;
+      }
+    }
+    const attemptIds=new Set(workouts.flatMap(w=>w.attemptIds));
+    const existingAttempts=localIds('attempts');
+    const existingArchive=localIds('archived');
+    const existingIncomplete=localIds('incomplete');
+    const additions={athletes:incoming.athletes,workouts,
+      attempts:incoming.attempts.filter(a=>existingAttempts.has(a.id)||(retained.has(a.workoutId)&&attemptIds.has(a.id))),
+      archived:incoming.archived.filter(a=>existingArchive.has(a.id)||isNew(a.athleteId)||archiveTime(a)>cutoff(a.athleteId)),
+      incomplete:incoming.incomplete.filter(a=>existingIncomplete.has(a.id)||isNew(a.athleteId)),
+      childSessions:[]};
+    for(const session of incoming.childSessions){
+      const allowed=new Set(session.workoutIds.filter(id=>retained.has(id)));
+      for(const id of session.unavailableWorkoutIds??[]){
+        const aid=session.athleteIds[session.workoutIds.indexOf(id)];
+        if(isNew(aid)||s.childSessions.some(saved=>saved.id===session.id&&saved.unavailableWorkoutIds?.includes(id)))allowed.add(id);
+      }
+      if(allowed.size)additions.childSessions.push(projectSession(session,allowed));
+    }
+    return mutation(s,n=>{
+      appendRecords(n,additions,conflicts);
+      for(const [aid,time] of Object.entries(incoming.coachImportCutoffs??{})){
+        if(isNew(aid))advanceCutoff(cutoffs,aid,time);
+      }
+      for(const w of workouts)if(!localWorkouts.has(w.id))advanceCutoff(cutoffs,w.athleteId,workoutTime(w));
+      for(const a of additions.archived)if(!existingArchive.has(a.id))advanceCutoff(cutoffs,a.athleteId,archiveTime(a));
+      if(cutoffs.size)n.coachImportCutoffs=Object.fromEntries(cutoffs);
+      return true;
+    });
+  }
   function merge(s,imported){validate(s);validate(imported);
     for(const a of imported.athletes)if(s.athletes.some(x=>x.id===a.id))assert(equivalent(profileProjection(s,a.id),profileProjection(imported,a.id)),'Конфликт профиля или истории: '+a.name);
-    return mutation(s,n=>{for(const field of ['athletes',...fields]){const existing=new Map(n[field].map(x=>[x.id,x]));for(const x of imported[field]){const old=existing.get(x.id);if(!old)n[field].push(clone(x));else assert(field==='workouts'?equivalent(comparableWorkout(old),comparableWorkout(x)):equivalent(old,x),'Конфликт при импорте: '+x.id);}}return true;});
+    return mutation(s,n=>{appendRecords(n,imported);return true;});
   }
   function evaluateImport(s,raw,authorized=false,baseId){
     validate(s);assert(!s.device.activeWorkoutId&&!currentChild(s),'Сначала завершите тренировку или занятие');
@@ -465,11 +559,16 @@
     const incoming=normalizeImport(source,chosen);
     assert(authorized||fresh||incoming.athletes.every(a=>a.id===s.baseProfileId),'Требуется PIN Тренера');
     let r;
-    if(fresh){const n=clone(incoming);n.baseProfileId=chosen;n.revision=s.revision+1;n.device={...s.device,profileUnconfigured:false,selectedAthleteId:chosen,trainerAthleteId:chosen,viewAthleteId:chosen,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};r={state:upgradePersonalProfile(validate(n)),value:true};}
-    else{
-      if(authorized)preserveTrainerEdits(s,incoming);
-      r=merge(s,incoming);
-    }
+    if(fresh){
+      incoming.baseProfileId=chosen;
+      incoming.revision=s.revision+1;
+      incoming.device={...s.device,profileUnconfigured:false,selectedAthleteId:chosen,trainerAthleteId:chosen,viewAthleteId:chosen,activeWorkoutId:null,activeChildSessionId:null,childParticipants:[]};
+      if(authorized){
+        const cutoffs=coachCutoffs(incoming);
+        if(cutoffs.size)incoming.coachImportCutoffs=Object.fromEntries(cutoffs);
+      }else delete incoming.coachImportCutoffs;
+      r={state:upgradePersonalProfile(validate(incoming)),value:true};
+    }else r=authorized?mergeCoachHistory(s,incoming):merge(s,incoming);
     r.state.device.trainerActivated=false;return r;
   }
   function renderChartData(s,athleteId,includeArchive=false){
