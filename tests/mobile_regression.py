@@ -146,7 +146,7 @@ def test_history_chart_portrait(browser):
         footer=q.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера')
-        assert version.inner_text()=='Версия 0.3.6-rc.7'
+        assert version.inner_text()=='Версия 0.3.6'
         assert '·' not in footer.inner_text()
         assert abs(version.bounding_box()['x']+version.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1
         assert abs(login.bounding_box()['x']+login.bounding_box()['width']/2-footer.bounding_box()['x']-footer.bounding_box()['width']/2)<1

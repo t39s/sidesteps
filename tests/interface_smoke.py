@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
-        assert version.inner_text()=='Версия 0.3.6-rc.7'
+        assert version.inner_text()=='Версия 0.3.6'
         assert login.is_visible()
         button_style='e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.fontSize,s.lineHeight,s.borderRadius,s.padding]}'
         login_style=login.evaluate(button_style)
@@ -96,7 +96,7 @@ with sync_playwright() as playwright:
         assert page.locator('header').get_by_role('button', name='Выход из интерфейса тренера', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.7'
+        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6'
         exit_button=footer.get_by_role('button',name='Выход из интерфейса тренера',exact=True)
         exit_box=exit_button.bounding_box()
         assert exit_button.evaluate(button_style)==login_style

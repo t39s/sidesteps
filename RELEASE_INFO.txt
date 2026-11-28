@@ -1,6 +1,7 @@
-sidesteps v0.3.6-rc.7
-Candidate date: 2026-11-28
-Status: PREVIEW
-Branch: develop
+sidesteps v0.3.6
+Release date: 2026-11-28
+Status: STABLE — accepted by owner 2026-11-28
+Branch: main
 Stable baseline: v0.3.5, main 7196e43a2fd6ad1d67f1ec9bf9341489cd867040
-Changes: Give the coach exit button its new label and match the coach entry button styling.
+Accepted candidate: v0.3.6-rc.7, a1c383669df3ec34f43bcdd940daedf886089517
+Changes: Unique athlete profile IDs, incremental coach imports, and updated training and backup interface labels.

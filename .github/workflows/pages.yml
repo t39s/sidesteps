@@ -170,12 +170,12 @@ jobs:
           fetch-depth: 0
       - name: Create immutable release tag if absent
         run: |
-          grep -qx 'sidesteps v0.3.5' <(head -n 1 RELEASE_INFO.txt)
-          if git ls-remote --exit-code origin refs/tags/v0.3.5; then
-            echo 'v0.3.5 already exists; no change to tag.'
+          grep -qx 'sidesteps v0.3.6' <(head -n 1 RELEASE_INFO.txt)
+          if git ls-remote --exit-code origin refs/tags/v0.3.6; then
+            echo 'v0.3.6 already exists; no change to tag.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -a v0.3.5 -m 'sidesteps v0.3.5 — accepted stable release'
-          git push origin refs/tags/v0.3.5
+          git tag -a v0.3.6 -m 'sidesteps v0.3.6 — accepted stable release'
+          git push origin refs/tags/v0.3.6
