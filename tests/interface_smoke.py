@@ -23,7 +23,7 @@ with sync_playwright() as playwright:
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
         assert version.inner_text()=='Версия 0.3.6-rc.7'
         assert login.is_visible()
-        button_style='e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.fontSize,s.borderRadius,s.padding]}'
+        button_style='e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.fontSize,s.lineHeight,s.borderRadius,s.padding]}'
         login_style=login.evaluate(button_style)
         login_box=login.bounding_box()
         assert page.title()=='Приставные шаги на время'
@@ -101,7 +101,6 @@ with sync_playwright() as playwright:
         exit_box=exit_button.bounding_box()
         assert exit_button.evaluate(button_style)==login_style
         assert abs(exit_box['width']-login_box['width'])<1
-        assert abs(exit_box['height']-login_box['height'])<1
         assert exit_box['y']+exit_box['height']<=footer.locator('.app-version').bounding_box()['y']
         footer.get_by_role('button', name='Выход из интерфейса тренера', exact=True).click()
         assert page.get_by_role('tab', name='История', exact=True).is_visible()

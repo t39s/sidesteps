@@ -152,7 +152,7 @@ test('trainer exit is a button and returns to athlete history',async()=>{
     if(screen==='child-final')f.api.load(finish({child:true}).state);
     f.api.setScreen(screen);f.api.render();
     const html=f.app.innerHTML;
-    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span><button type="button"[^>]*data-act="switch-athlete"[^>]*>Выход из интерфейса тренера<\/button>/,screen);
+    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span><div class="buttons history-actions"><button type="button"[^>]*data-act="switch-athlete"[^>]*>Выход из интерфейса тренера<\/button>/,screen);
     assert.equal((html.match(/data-act="switch-athlete"/g)||[]).length,1,screen);
   }
   const {state,result}=finish({child:true,planned:2});

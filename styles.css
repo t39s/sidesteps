@@ -130,7 +130,7 @@ body.trainer-theme{background:#321B27}
 .workout-comments textarea{display:block;width:100%;background:#0d2135;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:5px;resize:vertical}
 .comment-text{white-space:pre-wrap;overflow-wrap:anywhere}
 
-.athlete-footer{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}.athlete-footer>.app-version{order:2}.athlete-footer>[data-act="switch-athlete"]{order:1}
+.athlete-footer{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center}.athlete-footer>.app-version{order:2}.athlete-footer>.history-actions{order:1}
 
 .backup-actions{display:grid;grid-template-columns:minmax(0,1fr)}.backup-actions>button{width:100%;min-width:0}
 
