@@ -146,13 +146,13 @@ test('trainer history has one login below brand and athlete history panels',()=>
     assert.match(html,/Спортсмен/);
   }
 });
-test('trainer exit is a link and returns to athlete history',async()=>{
+test('trainer exit is a button and returns to athlete history',async()=>{
   const s=M.blank();s.device.lastInterface='trainer';const f=fixture(s);f.api.unlock();
   for(const screen of ['trainer','history','child-final']){
     if(screen==='child-final')f.api.load(finish({child:true}).state);
     f.api.setScreen(screen);f.api.render();
     const html=f.app.innerHTML;
-    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span><a href="#exit" data-act="switch-athlete">Интерфейс спортсмена<\/a>/,screen);
+    assert.match(html,/<footer[^>]*><span class="app-version">[^<]+<\/span><button type="button"[^>]*data-act="switch-athlete"[^>]*>Интерфейс спортсмена<\/button>/,screen);
     assert.equal((html.match(/data-act="switch-athlete"/g)||[]).length,1,screen);
   }
   const {state,result}=finish({child:true,planned:2});

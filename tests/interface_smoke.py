@@ -21,7 +21,7 @@ with sync_playwright() as playwright:
         footer=page.locator('footer')
         version=footer.locator('.app-version')
         login=footer.get_by_role('button',name='Вход в интерфейс тренера',exact=True)
-        assert version.inner_text()=='Версия 0.3.6-rc.5'
+        assert version.inner_text()=='Версия 0.3.6-rc.6'
         assert login.is_visible()
         assert page.title()=='Приставные шаги на время'
         page.get_by_role('tab',name='Новая тренировка').click()
@@ -61,9 +61,12 @@ with sync_playwright() as playwright:
         backup.click()
         assert page.get_by_role('heading',name='Резервное копирование',exact=True).is_visible()
         assert page.locator('#profile-name').count()==0
-        assert page.get_by_role('button',name='Сохранить копию',exact=True).is_visible()
-        assert page.get_by_role('button',name='Восстановить данные',exact=True).is_visible()
-        page.get_by_role('button',name='Назад',exact=True).click()
+        save_backup=page.get_by_role('button',name='Сохранить копию',exact=True)
+        restore=page.get_by_role('button',name='Восстановить данные',exact=True)
+        back=page.get_by_role('button',name='Назад',exact=True)
+        assert save_backup.evaluate('(e)=>getComputedStyle(e).backgroundColor')==save_background
+        assert back.evaluate('(e)=>getComputedStyle(e).backgroundColor')==restore.evaluate('(e)=>getComputedStyle(e).backgroundColor')
+        back.click()
         login.click()
         assert page.get_by_role('heading', name='Вход в интерфейс тренера', exact=True).is_visible()
         assert page.evaluate('scrollY')==0
@@ -84,20 +87,20 @@ with sync_playwright() as playwright:
         assert page.evaluate('scrollY')==0
         page.locator('#pin-input').fill(PIN)
         page.get_by_role('button',name='Войти',exact=True).click()
-        page.get_by_role('link', name='Интерфейс спортсмена', exact=True).wait_for()
+        page.get_by_role('button', name='Интерфейс спортсмена', exact=True).wait_for()
         assert page.evaluate('scrollY')==0
-        assert page.get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 1
-        assert page.locator('header').get_by_role('link', name='Интерфейс спортсмена', exact=True).count() == 0
+        assert page.get_by_role('button', name='Интерфейс спортсмена', exact=True).count() == 1
+        assert page.locator('header').get_by_role('button', name='Интерфейс спортсмена', exact=True).count() == 0
         footer = page.locator('footer')
         assert '·' not in footer.inner_text()
-        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.5'
-        exit_link=footer.get_by_role('link',name='Интерфейс спортсмена',exact=True)
-        assert exit_link.bounding_box()['y']+exit_link.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
-        footer.get_by_role('link', name='Интерфейс спортсмена', exact=True).click()
+        assert footer.locator('.app-version').inner_text()=='Версия 0.3.6-rc.6'
+        exit_button=footer.get_by_role('button',name='Интерфейс спортсмена',exact=True)
+        assert exit_button.bounding_box()['y']+exit_button.bounding_box()['height']<=footer.locator('.app-version').bounding_box()['y']
+        footer.get_by_role('button', name='Интерфейс спортсмена', exact=True).click()
         assert page.get_by_role('tab', name='История', exact=True).is_visible()
         assert page.evaluate('scrollY')==0
         assert login.is_visible()
-        assert not page.get_by_role('link', name='Интерфейс спортсмена', exact=True).count()
+        assert not page.get_by_role('button', name='Интерфейс спортсмена', exact=True).count()
         assert not errors, errors
         page.close()
         print('PASS interface navigation', width, flush=True)

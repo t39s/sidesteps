@@ -1,6 +1,6 @@
-sidesteps v0.3.6-rc.5
+sidesteps v0.3.6-rc.6
 Candidate date: 2026-11-28
 Status: PREVIEW
 Branch: develop
 Stable baseline: v0.3.5, main 7196e43a2fd6ad1d67f1ec9bf9341489cd867040
-Changes: Rename the coach profile data block and its backup and import actions, and lay out the actions as full-width rows.
+Changes: Highlight coach import and athlete backup, update their button order or styling, and render the coach exit as a button.
